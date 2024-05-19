@@ -1,5 +1,6 @@
 using { /Fortnite.com/Characters }
 using { /Fortnite.com/Devices }
+using { /Fortnite.com/UI }
 using { /UnrealEngine.com/Assets }
 using { /UnrealEngine.com/Temporary/SpatialMath }
 using { /UnrealEngine.com/Temporary/UI }
@@ -13,6 +14,28 @@ using { /Verse.org/Simulation/Tags }
 ## Tags ##
 spawner:=class(tag){}
 prop_interaction:=class(tag){}
+start:=class(tag){}
+level1:=class(tag){}
+level2:=class(tag){}
+buttondevice:=class(tag){}
+trashcan:=class(tag){}
+cuttingboard:=class(tag){}
+cleanplate:=class(tag){}
+dirtyplate:=class(tag){}
+stove:=class(tag){}
+pot1:=class(tag){}
+pot2:=class(tag){}
+pot3:=class(tag){}
+pot4:=class(tag){}
+sink:=class(tag){}
+carrot:=class(tag){}
+chicken:=class(tag){}
+cucumber:=class(tag){}
+potato:=class(tag){}
+rice:=class(tag){}
+seaweed:=class(tag){}
+fishzone:=class(tag){}
+waiter:=class(tag){}
 
 ## Custom player ##
 custom_player:=class<unique>():
@@ -32,11 +55,25 @@ custom_player:=class<unique>():
         else if(Agent:=agent[Player]):
             GoldChefsHat.Pickup(Agent)
 
-    PickingUpItem(Item:item):void=
+    PickingUpItem(Item:item):logic=
         if(not InventoryFull?):
+            Item.Dispose()
             set InventoryFull = true
             set ItemCarrying += array{Item}
             spawn{Carry()}
+            return true
+        if:
+            InventoryFull?
+            ContainerCarrying:=ItemCarrying[0]
+            Plate:=container[ContainerCarrying]
+            Plate.Contains.Length<Plate.Size
+            PreparedIngredient:=ingredient[Item]
+            PreparedIngredient.Prepared?
+        then:
+            Item.Dispose()
+            Plate.Fill(array{PreparedIngredient},Self)
+            return true
+        return false
 
     Carry<private>()<suspends>:void=
         loop:
@@ -57,6 +94,104 @@ custom_player:=class<unique>():
     
     Dispose():void=
         Print("Cleaning up.")
+
+## Levels ##
+custom_level:=class():
+    StringToMessage<private><localizes>(S:string):message="{S}"
+    var LevelName:?string
+    var TrueLevelName<private>:string=""
+    var LevelIcon:?texture
+    var TrueLevelIcon<private>:texture=Icons.IC_MapCode
+    var RecipeIcon:?texture
+    var TrueRecipeIcon:texture=Icons.IC_MapCode
+    ButtonClickedEvent<public> : event(widget_message) = event(widget_message){}
+    var WdataArray:[]widget_message=array{}
+    var LevelTag:?tag
+    var TrueLevelTag<private>:tag=start{}
+    var PlayersSpawner:[]player_spawner_device=array{}
+    var Camera:gameplay_camera_fixed_point_device=gameplay_camera_fixed_point_device{}
+    var Teleporter:teleporter_device=teleporter_device{}
+    var LevelRandomIngredients:?[]ingredient
+    var TrueLevelRandomIngredients:[]ingredient=array{}
+    var StandardSlots:?[]ingredient
+    var MaxIngredients:int
+    #recipe template: ?type
+
+    StackBoxCreator():stack_box=
+        if(Name:=LevelName?,Icon:=LevelIcon?,IconRecipe:=RecipeIcon?,Tag:=LevelTag?,Ingredients:=LevelRandomIngredients?):
+            set TrueLevelName=Name
+            set TrueLevelIcon=Icon
+            set TrueRecipeIcon=IconRecipe
+            set TrueLevelTag=Tag
+            set TrueLevelRandomIngredients=Ingredients
+        Print("Creating {TrueLevelName}'s stack box.")
+
+        #### Setting up stacks variables ####
+        TrueLevelNameText := text_block:
+            DefaultText:=StringToMessage(TrueLevelName) 
+            DefaultTextColor:=White
+            DefaultShadowColor:=Black
+            DefaultShadowOffset:=option{vector2{X:=2.0,Y:=2.0}}
+        TrueLevelNameText.SetShadowOpacity(1.0)
+        LevelTextureBlock := texture_block:
+            DefaultImage:= TrueLevelIcon
+            DefaultDesiredSize := vector2{X := 250.0, Y := 250.0}
+        Button := button_regular:
+            DefaultText:=StringToMessage("Vote")
+        Button.OnClick().Subscribe(HandleButton)
+        
+        #### Creating stack ####
+        LevelStack := stack_box:
+            Orientation := orientation.Vertical
+            Slots := array:
+                stack_box_slot:
+                    Widget := LevelTextureBlock
+                    HorizontalAlignment:=horizontal_alignment.Center
+                    VerticalAlignment:=vertical_alignment.Center
+                    Padding:=margin{Top:=0.0,Left:=0.0,Bottom:=5.0,Right:=0.0}
+                stack_box_slot:
+                    Widget := TrueLevelNameText
+                    HorizontalAlignment:=horizontal_alignment.Center
+                    VerticalAlignment:=vertical_alignment.Center
+                    Padding:=margin{Top:=0.0,Left:=0.0,Bottom:=10.0,Right:=0.0}
+                stack_box_slot:
+                    Widget := Button
+                    HorizontalAlignment:=horizontal_alignment.Center
+                    VerticalAlignment:=vertical_alignment.Center
+        return LevelStack
+    
+    HandleButton(Wdata:widget_message):void=
+        Print("{TrueLevelName} button clicked!")
+        if(set WdataArray[0]=Wdata):
+            Print("Done")
+        else:
+            Print("WdataArray is empty. Adding first element...")
+            set WdataArray += array{Wdata}
+        ButtonClickedEvent.Signal(Wdata)
+
+    Start():void=
+        Print("Start")
+        TaggedLevelDevices:=GetCreativeObjectsWithTag(TrueLevelTag)
+        for(TaggedDevice:TaggedLevelDevices):
+            Print("Device found")
+            if(PlayerTeleporter:=teleporter_device[TaggedDevice]):
+                Print("Teleporter Enabled")
+                PlayerTeleporter.Enable()
+                set Teleporter=PlayerTeleporter
+            if(CameraDevice:=gameplay_camera_fixed_point_device[TaggedDevice]):
+                Print("Camera found")
+                set Camera=CameraDevice
+                Camera.Enable()
+                Camera.AddToAll()
+
+## Difficulty 
+difficulty:=class():
+    DifficultyName:string
+    ExpireOrder:float  
+    DeliverOrderPoints:int
+    var MinAwardingXP:accolades_device=accolades_device{}
+    var MidAwardingXP:accolades_device=accolades_device{}
+    var MaxAwardingXP:accolades_device=accolades_device{}
 
 ## Items ##
 dropped_item:=class():
@@ -81,11 +216,31 @@ item := class():
         case(Type):
             "Ingredient"=>
                 if(IngredientItem:=ingredient[Self]):
-                    NewIngredient:ingredient=ingredient{ItemName:=IngredientItem.ItemName,Mesh:=IngredientItem.Mesh,ItemIcon:=IngredientItem.ItemIcon,VFX:=IngredientItem.VFX,MeshChopped:=IngredientItem.MeshChopped,VFXChopped:=IngredientItem.VFXChopped,IconVFX:=IngredientItem.IconVFX}
+                    NewIngredient:ingredient=ingredient{
+                        ItemName:=IngredientItem.ItemName
+                        ItemChoppable:=IngredientItem.ItemChoppable
+                        ItemBoilable:=IngredientItem.ItemBoilable
+                        Prepared:=IngredientItem.Prepared
+                        Mesh:=IngredientItem.Mesh
+                        ItemIcon:=IngredientItem.ItemIcon
+                        VFX:=IngredientItem.VFX
+                        MeshChopped:=IngredientItem.MeshChopped
+                        VFXChopped:=IngredientItem.VFXChopped
+                        IconVFX:=IngredientItem.IconVFX
+                        }
                     set NewItem = NewIngredient
             "Container"=>
                 if(ContainerItem:=container[Self]):
-                    NewContainer:container=container{ItemName:=ContainerItem.ItemName,Mesh:=ContainerItem.Mesh,VFX:=ContainerItem.VFX,MeshFull:=ContainerItem.MeshFull,MeshDirty:=ContainerItem.MeshDirty,VFXFull:=ContainerItem.VFXFull,VFXDirty:=ContainerItem.VFXDirty,Deliverable:=true}
+                    NewContainer:container=container{
+                        ItemName:=ContainerItem.ItemName
+                        Mesh:=ContainerItem.Mesh
+                        VFX:=ContainerItem.VFX
+                        MeshFull:=ContainerItem.MeshFull
+                        MeshDirty:=ContainerItem.MeshDirty
+                        VFXFull:=ContainerItem.VFXFull
+                        VFXDirty:=ContainerItem.VFXDirty
+                        Deliverable:=true
+                        }
                     set NewItem = NewContainer
             _=>
                 Item:item=item{ItemName:=ItemName}
@@ -103,12 +258,14 @@ item := class():
 ingredient:=class(item):
     Type<override>:string="Ingredient"
     ItemIcon:texture
+    ItemChoppable:logic
+    ItemBoilable:logic
     var IconVFX:?particle_system=false
     var MeshChopped:creative_prop_asset
     var VFXChopped:visual_effect_powerup_device
     var Chopped:logic=false
-    var Boiled:logic=false
-    var Burnt:logic=false
+    var Prepared:logic=false
+    var Overcooked:logic=false
     var SpawnedVFX:?cancelable=false
 
     ItemMesh<override>():creative_prop_asset=
@@ -126,22 +283,17 @@ ingredient:=class(item):
             set SpawnedVFX=option{SpawnParticleSystem(IsIconVFX,Position)}
 
     Chopping():void=
-        if(not Chopped?):
+        if(ItemChoppable?,not Chopped?):
             set Chopped = true
             ItemMesh()
-
-    PuttingInPot(CookingPot:pot,Player:custom_player):void=
-        if(Chopped?):
-            IngredientArray:[]ingredient=array{Self}
-            CookingPot.Fill(IngredientArray,Player)
-
-    PuttingInPlate(CookingPot:pot,Plate:container,Player:custom_player):void=
-        Plate.Fill(CookingPot.Contains,Player)   
-
+            if(not ItemBoilable?):
+                set Prepared=true
+                
 container:=class(item):
     Type<override>:string="Container"
-    var Deliverable:logic
+    Deliverable:logic
     var Contains:[]ingredient=array{}
+    Size:int=3
     var Dirty:logic=false
     var MeshFull :creative_prop_asset = DefaultCreativePropAsset
     var MeshDirty :creative_prop_asset = DefaultCreativePropAsset
@@ -163,17 +315,14 @@ container:=class(item):
         return VFX
 
     Fill(IngredientArray:[]ingredient,Player:custom_player):void=#If i am holding a semifull plate and I interact with the pot it takes all the ingredients, find a workaround
-        if(Contains.Length<3):
+        if(Contains.Length<Size):
             set Contains += IngredientArray
             if(Player.ItemCarrying[0].Type="Ingredient"):
                 Player.DiscardingItem()
-            if(Self.Type="Pot",PotContainer:=pot[Self]):
+            if(PotContainer:=pot[Self]):
                 PotContainer.IngredientVFX()
-            if(Contains.Length = 3):
-                if(Self.Type="Pot",PotContainer:=pot[Self]):
+                if(Contains.Length = Size):
                     spawn{PotContainer.Boil(Contains)}
-            for(Ingredient:IngredientArray):
-                Print("{3 - Contains.Length} spots in the container.")
 
     WashDish(Player:custom_player):void=
         Print("Dish washed.")
@@ -188,59 +337,52 @@ container:=class(item):
 pot:=class(container):
     Type<override>:string="Pot"
     Position:vector3
+    BoilTime:float=8.0
     var Boiled:logic=false
     var Burnt:logic=false
     var SpawnedTickVFX:?cancelable=false
-    var SoupProp:creative_prop=creative_prop{}
+    var SoupProp<private>:creative_prop=creative_prop{}
     var SoupMesh:?creative_prop_asset
     var BellRing:audio_player_device=audio_player_device{}
 
     IngredientVFX():void=
         N:=Contains.Length-1
-        if(N>0):
-            SoupProp.Dispose()
+        SoupProp.Dispose()
         if(Soup:=SoupMesh?,SpawnedSoup:=SpawnProp(Soup,Position+vector3{Z:=12.0+N*7.0},rotation{})):
-            if(MaybeSpawnedSoup:=SpawnedSoup(0)?,set SoupProp=MaybeSpawnedSoup){}    
+            if(MaybeSpawnedSoup:=SpawnedSoup(0)?,set SoupProp=MaybeSpawnedSoup){}
             if(LastIngredient:=Contains[N]):
                 VFXPosition:=Position+vector3{X:=(N-1)*70.0,Y:=20.0,Z:=80.0}
                 LastIngredient.SpawnVFXInPot(VFXPosition)
+                Print("We got last ingredient too")
 
     Boil(Ingredients:[]ingredient)<suspends>:void= #when the pot becomes full change text to serv soup
         Print("Start boiling.")
-        Sleep(8.0)
-        set SpawnedTickVFX=option{SpawnParticleSystem(Niagara.NS_Tick,vector3{X:=Position.X,Y:=Position.Y+80.0,Z:=180.0})}
+        Sleep(BoilTime)
+        set SpawnedTickVFX=option{SpawnParticleSystem(Niagara.NS_Tick,vector3{X:=Position.X,Y:=Position.Y+80.0,Z:=Position.Z+75.0})}
         set Boiled = true
         for(Ingredient:Ingredients):
-            set Ingredient.Boiled = true
+            set Ingredient.Prepared = true
         BellRing.Play()
-        Sleep(9.0)
+        Sleep(8.0)
         if(Tick:=SpawnedTickVFX?):
             Tick.Cancel()
-        if(Contains.Length=3):
-            set SpawnedTickVFX=option{SpawnParticleSystem(Niagara.NS_Ex,vector3{X:=Position.X,Y:=Position.Y+80.0,Z:=180.0})}
+        if(Contains.Length=Size):
+            set SpawnedTickVFX=option{SpawnParticleSystem(Niagara.NS_Ex,vector3{X:=Position.X,Y:=Position.Y+80.0,Z:=Position.Z+75.0})}
             set Burnt = true
             for(Ingredient:Ingredients):
-                set Ingredient.Burnt = true
+                set Ingredient.Overcooked = true
 
     Empty<override>():void=
         Print("Emptying {Self.ItemName}...")
         for(Ingredient:Contains):
             if(HasVFX:=Ingredient.SpawnedVFX?):
                 HasVFX.Cancel()
-                SoupProp.Dispose()
+            SoupProp.Dispose()
         set Contains = array{}
-
-## Difficulty 
-difficulty:=class():
-    DifficultyName:string
-    ExpireOrder:float  
-    DeliverOrderPoints:int
-    var MinAwardingXP:accolades_device=accolades_device{}
-    var MidAwardingXP:accolades_device=accolades_device{}
-    var MaxAwardingXP:accolades_device=accolades_device{}
 
 recipe:=class<unique>():
     BGTexture:texture=Icons.IC_OrderBG
+    var RecipeIcon:texture
     var Ingredients:[]ingredient=array{}
     var Completed:logic=false
     var RecipeCanvas:canvas=canvas{}
@@ -261,7 +403,7 @@ recipe:=class<unique>():
                     SizeToContent := true
                     ZOrder:=4
                 canvas_slot:
-                    Widget:=texture_block{DefaultImage:=Icons.IC_Pot,DefaultDesiredSize:=vector2{X:=150.0,Y:=150.0}}
+                    Widget:=texture_block{DefaultImage:=RecipeIcon,DefaultDesiredSize:=vector2{X:=150.0,Y:=150.0}}
                     Anchors := anchors:
                         Minimum := vector2{X := 0.0, Y := 0.5}
                         Maximum := vector2{X := 0.0, Y := 0.5}
