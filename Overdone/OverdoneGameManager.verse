@@ -1,7 +1,9 @@
 using { /Fortnite.com/Characters }
 using { /Fortnite.com/Devices }
+using { /Fortnite.com/FortPlayerUtilities }
 using { /Fortnite.com/Game }
 using { /Fortnite.com/UI }
+using { /UnrealEngine.com/Assets }
 using { /UnrealEngine.com/Temporary/Diagnostics }
 using { /UnrealEngine.com/Temporary/SpatialMath }
 using { /UnrealEngine.com/Temporary/UI }
@@ -18,6 +20,15 @@ Game_Manager := class(creative_device):
     var SavedPlayerData:weak_map(player, custom_player) = map{}
     var RoundEnded:logic=false
     PickUpRange:float=120.0
+    var CurrentLevel:custom_level=custom_level{
+        LevelName:=false
+        LevelIcon:=false
+        RecipeIcon:=false
+        LevelTag:=false
+        LevelRandomIngredients:=false
+        StandardSlots:=false
+        MaxIngredients:=0
+        }
     # Difficulty
     Easy:difficulty=difficulty{DifficultyName:="Easy",ExpireOrder:=120.0,DeliverOrderPoints:=150}
     Medium:difficulty=difficulty{DifficultyName:="Medium",ExpireOrder:=90.0,DeliverOrderPoints:=120}
@@ -27,7 +38,6 @@ Game_Manager := class(creative_device):
     @editable MediumXP:accolades_device=accolades_device{}
     @editable LargeXP:accolades_device=accolades_device{}
     @editable VeryLargeXP:accolades_device=accolades_device{}
-    var DifficultyArray:[]difficulty=array{}
     var FinalTimeToExpireOrder:float=0.0
     
     MaxPoints:int=750
@@ -38,14 +48,66 @@ Game_Manager := class(creative_device):
     var AwardMidXP:accolades_device=accolades_device{}
     var AwardMinXP:accolades_device=accolades_device{}
 
-    # Items with meshes
     Nothing:item=item{ItemName:="Null"}
-    Carrot:ingredient=ingredient{ItemName:= "Carrot",ItemIcon:=Icons.IC_Carrot,MeshChopped:=DefaultCreativePropAsset,VFXChopped:=visual_effect_powerup_device{}}
-    Chicken:ingredient=ingredient{ItemName:= "Chicken",ItemIcon:=Icons.IC_Chicken,MeshChopped:=DefaultCreativePropAsset,VFXChopped:=visual_effect_powerup_device{}}
-    Potato:ingredient=ingredient{ItemName:= "Potato",ItemIcon:=Icons.IC_Potato,MeshChopped:=DefaultCreativePropAsset,VFXChopped:=visual_effect_powerup_device{}}
+    # Ingredients
+    Carrot:ingredient=ingredient{
+        ItemName:= "Carrot"
+        ItemIcon:=Icons.IC_Carrot
+        ItemChoppable:=true
+        ItemBoilable:=true
+        MeshChopped:=DefaultCreativePropAsset
+        VFXChopped:=visual_effect_powerup_device{}}
+    Chicken:ingredient=ingredient{
+        ItemName:= "Chicken"
+        ItemIcon:=Icons.IC_Chicken
+        ItemChoppable:=true
+        ItemBoilable:=true
+        MeshChopped:=DefaultCreativePropAsset
+        VFXChopped:=visual_effect_powerup_device{}}
+    Cucumber:ingredient=ingredient{
+        ItemName:= "Cucumber"
+        ItemIcon:=Icons.IC_Cucumber
+        ItemChoppable:=true
+        ItemBoilable:=false
+        MeshChopped:=DefaultCreativePropAsset
+        VFXChopped:=visual_effect_powerup_device{}}
+    Potato:ingredient=ingredient{
+        ItemName:= "Potato"
+        ItemIcon:=Icons.IC_Potato
+        ItemChoppable:=true
+        ItemBoilable:=true
+        MeshChopped:=DefaultCreativePropAsset
+        VFXChopped:=visual_effect_powerup_device{}}
+    Seaweed:ingredient=ingredient{
+        ItemName:= "Seaweed"
+        ItemIcon:=Icons.IC_Seaweed
+        ItemChoppable:=false
+        ItemBoilable:=false
+        Prepared:=true
+        MeshChopped:=DefaultCreativePropAsset
+        VFXChopped:=visual_effect_powerup_device{}}
+    Rice:ingredient=ingredient{
+        ItemName:= "Rice"
+        ItemIcon:=Icons.IC_Rice
+        ItemChoppable:=false
+        ItemBoilable:=true
+        MeshChopped:=DefaultCreativePropAsset
+        VFXChopped:=visual_effect_powerup_device{}}
+    Fish:ingredient=ingredient{
+        ItemName:= "Fish"
+        ItemIcon:=Icons.IC_Fish
+        ItemChoppable:=true
+        ItemBoilable:=false
+        MeshChopped:=DefaultCreativePropAsset
+        VFXChopped:=visual_effect_powerup_device{}}
+    
+    # Containers
     Plate:container=container{ItemName:="Plate",Deliverable:=true}
     CookingPot1:pot=pot{ItemName:="Cooking Pot",Deliverable:=false,Position:=vector3{X:=76.0,Y:=126.0,Z:=95.0},SoupMesh:=false}
     CookingPot2:pot=pot{ItemName:="Cooking Pot",Deliverable:=false,Position:=vector3{X:=374.0,Y:=78.0,Z:=95.0},SoupMesh:=false}
+    CookingPot3:pot=pot{ItemName:="Camping Stove",Deliverable:=false,Position:=vector3{X:=19756.27,Y:=54.9,Z:=274.0},SoupMesh:=false,Size:=1,BoilTime:=4.0}
+    CookingPot4:pot=pot{ItemName:="Camping Stove",Deliverable:=false,Position:=vector3{X:=19869.73,Y:=57.8,Z:=274.0},SoupMesh:=false,Size:=1,BoilTime:=4.0}
+    # Props / VFX
     @editable CarrotMesh:creative_prop_asset = DefaultCreativePropAsset
     @editable CarrotMeshChopped:creative_prop_asset = DefaultCreativePropAsset
     @editable CarrotVFX:visual_effect_powerup_device=visual_effect_powerup_device{}
@@ -54,37 +116,48 @@ Game_Manager := class(creative_device):
     @editable ChickenMeshChopped:creative_prop_asset = DefaultCreativePropAsset
     @editable ChickenVFX:visual_effect_powerup_device=visual_effect_powerup_device{}
     @editable ChickenVFXChopped:visual_effect_powerup_device=visual_effect_powerup_device{}
+    @editable CucumberMesh:creative_prop_asset = DefaultCreativePropAsset
+    @editable CucumberMeshChopped:creative_prop_asset = DefaultCreativePropAsset
+    @editable CucumberVFX:visual_effect_powerup_device=visual_effect_powerup_device{}
+    @editable CucumberVFXChopped:visual_effect_powerup_device=visual_effect_powerup_device{}
+    @editable FishMesh:creative_prop_asset = DefaultCreativePropAsset
+    @editable FishMeshChopped:creative_prop_asset = DefaultCreativePropAsset
+    @editable FishVFX:visual_effect_powerup_device=visual_effect_powerup_device{}
+    @editable FishVFXChopped:visual_effect_powerup_device=visual_effect_powerup_device{}
     @editable PotatoMesh:creative_prop_asset = DefaultCreativePropAsset
     @editable PotatoMeshChopped:creative_prop_asset = DefaultCreativePropAsset
     @editable PotatoVFX:visual_effect_powerup_device=visual_effect_powerup_device{}
     @editable PotatoVFXChopped:visual_effect_powerup_device=visual_effect_powerup_device{}
+    @editable RiceMesh:creative_prop_asset = DefaultCreativePropAsset
+    @editable RiceMeshChopped:creative_prop_asset = DefaultCreativePropAsset
+    @editable RiceVFX:visual_effect_powerup_device=visual_effect_powerup_device{}
+    @editable RiceVFXChopped:visual_effect_powerup_device=visual_effect_powerup_device{}
+    @editable SeaweedMesh:creative_prop_asset = DefaultCreativePropAsset
+    @editable SeaweedMeshChopped:creative_prop_asset = DefaultCreativePropAsset
+    @editable SeaweedVFX:visual_effect_powerup_device=visual_effect_powerup_device{}
+    @editable SeaweedVFXChopped:visual_effect_powerup_device=visual_effect_powerup_device{}
     @editable PlateMesh:creative_prop_asset = DefaultCreativePropAsset
     @editable PlateMeshFull:creative_prop_asset = DefaultCreativePropAsset
+    @editable PlateMeshFullSushi:creative_prop_asset = DefaultCreativePropAsset
     @editable PlateMeshDirty:creative_prop_asset = DefaultCreativePropAsset
     @editable PlateVFX:visual_effect_powerup_device=visual_effect_powerup_device{}
-    @editable PlateVFXFull:visual_effect_powerup_device=visual_effect_powerup_device{}
+    @editable PlateVFXFullSoup:visual_effect_powerup_device=visual_effect_powerup_device{}
+    @editable PlateVFXFullSushi:visual_effect_powerup_device=visual_effect_powerup_device{}
     @editable PlateVFXDirty:visual_effect_powerup_device=visual_effect_powerup_device{}
     @editable Soup:creative_prop_asset = DefaultCreativePropAsset
+    @editable RiceBoiling:creative_prop_asset = DefaultCreativePropAsset
     @editable BubblesVFX:vfx_spawner_device=vfx_spawner_device{}
     @editable ClearVFXTrigger:trigger_device=trigger_device{}
+    # Extra Functionality
     var DroppedItemsArray:[]dropped_item=array{}
     var PlatesTaken:int=0
     var DirtyPlatesArray:[]container=array{}
     # Devices to interact with
     @editable DropInputTrigger:input_trigger_device = input_trigger_device{}
     @editable PickUpInputTrigger:input_trigger_device = input_trigger_device{}
-    @editable CarrotButton : button_device = button_device{}
-    @editable ChickenButton : button_device = button_device{}
-    @editable PotatoButton : button_device = button_device{}
-    @editable CuttingBoard1Button : button_device = button_device{}
-    @editable CuttingBoard2Button : button_device = button_device{}
-    @editable StoveButton1Button : button_device = button_device{}
-    @editable StoveButton2Button : button_device = button_device{}
-    @editable PlateButton : button_device = button_device{}
-    @editable WaiterDevice : character_device = character_device{}
-    @editable DirtyPlateButton : button_device = button_device{}
-    @editable SinkButton : button_device = button_device{}
-    @editable TrashcanButton : button_device = button_device{}
+    var PlateButton : button_device = button_device{}
+    var DirtyPlateButton : button_device = button_device{}
+    var WaiterDevice : character_device = character_device{}
     # Extras
     @editable IntroCinematic:cinematic_sequence_device=cinematic_sequence_device{}
     @editable GameTimer:timer_device=timer_device{}
@@ -95,7 +168,7 @@ Game_Manager := class(creative_device):
     @editable BellRing:audio_player_device=audio_player_device{}
     @editable BellFinal:audio_player_device=audio_player_device{}
     @editable EndGameDevice:end_game_device=end_game_device{}
-    #Point System
+    # Point System
     var PointsGathered:int=0
     var DeliverOrderPointsGranting:int=0
     
@@ -105,38 +178,26 @@ Game_Manager := class(creative_device):
         GetPlayspace().PlayerRemovedEvent().Subscribe(OnPlayerLeftServer)
         InitSpawners()
         PlayIntro()
-        SetUpDifficulties()
-        Sleep(2.0)
+        InitLevels()
+        InitDifficulties()
+        Sleep(1.0)
         set CustomUI.PlayerToCustomPlayerMap=CustomPlayers
         CustomUI.Assign()
-        Sleep(2.0)
-        CustomUI.ShowDifficultyVoteUI(true,1,false,array{Easy,Medium,Hard})
+        Sleep(3.0)
+        VotingUIs()
         CustomUI.CountdownEndedEvent.Await()
-        CustomUI.RemoveSomeHUDS(array{1,2})
-        CountVotes(CustomUI.PlayerVotes)
-        Sleep(2.0)
-        CustomUI.ShowInventoryTextUI(false,3,false)
-        CustomUI.ShowPointSystemUI(false,4,false,450)
-        spawn{CustomUI.OrderFood(false,5,false,array{Carrot,Chicken,Potato},20.0,FinalTimeToExpireOrder)}
+        CustomUI.RemoveSomeHUDS(array{2,3})
+        CountLevelVotes(CustomUI.PlayerLevelVotes,CustomUI.WidgetToLevelMap,CustomUI.SelectedLevels)
+        CountDifficultyVotes(CustomUI.PlayerDifficultyVotes)
+        Sleep(1.0)
+        CustomUI.ShowInventoryTextUI(false,4,false)
+        CustomUI.ShowPointSystemUI(false,5,false,450)
+        spawn{CustomUI.OrderFood(false,6,false,CurrentLevel.TrueLevelRandomIngredients,CurrentLevel.StandardSlots,CurrentLevel.MaxIngredients,CurrentLevel.TrueRecipeIcon,20.0,FinalTimeToExpireOrder)}
         GameTimer.SetActiveDuration(GameTotalTime)
         GameTimer.Start()
         SetUpItemMeshVFX()
-        EnableButtons()
         spawn{ButtonEnabler()}
-        DropInputTrigger.PressedEvent.Subscribe(DropItem)
-        PickUpInputTrigger.PressedEvent.Subscribe(PickUpItem)
-        CarrotButton.InteractedWithEvent.Subscribe(NewItemPickup_Handler{Device:=Self,CustomPlayerArray:=CustomPlayers,Item:=Carrot}.HandlerFunction)
-        ChickenButton.InteractedWithEvent.Subscribe(NewItemPickup_Handler{Device:=Self,CustomPlayerArray:=CustomPlayers,Item:=Chicken}.HandlerFunction)
-        PotatoButton.InteractedWithEvent.Subscribe(NewItemPickup_Handler{Device:=Self,CustomPlayerArray:=CustomPlayers,Item:=Potato}.HandlerFunction)
-        CuttingBoard1Button.InteractedWithEvent.Subscribe(ChoppingItemInteraction)
-        CuttingBoard2Button.InteractedWithEvent.Subscribe(ChoppingItemInteraction)
-        StoveButton1Button.InteractedWithEvent.Subscribe(CookingPotInteraction_Handler{Device:=Self,CustomPlayerArray:=CustomPlayers,CookingPot:=CookingPot1}.HandlerFunction)
-        StoveButton2Button.InteractedWithEvent.Subscribe(CookingPotInteraction_Handler{Device:=Self,CustomPlayerArray:=CustomPlayers,CookingPot:=CookingPot2}.HandlerFunction)
-        PlateButton.InteractedWithEvent.Subscribe(NewItemPickup_Handler{Device:=Self,CustomPlayerArray:=CustomPlayers,Item:=Plate}.HandlerFunction)
-        WaiterDevice.InteractedWithEvent.Subscribe(WaiterInteraction)
-        DirtyPlateButton.InteractedWithEvent.Subscribe(DirtyPlate)
-        SinkButton.InteractedWithEvent.Subscribe(WashDish)
-        TrashcanButton.InteractedWithEvent.Subscribe(TrashcanInteraction)
+        ButtonFunctionality()
         GameTimer.SuccessEvent.Subscribe(CompleteRound)
     
     InitSpawners():void=
@@ -171,37 +232,67 @@ Game_Manager := class(creative_device):
                 set NewCustomPlayerMap=ConcatenateMaps(NewCustomPlayerMap,map{Key=>Value})
             set CustomPlayers=NewCustomPlayerMap
 
-    CompleteRound(Agent:?agent):void=
-        Print("Round completed, counting game.")
-        set RoundEnded=true
-        BellFinal.Play()
-        DisableButtons()
-        CookingPot1.Empty()
-        CookingPot2.Empty()
-        CustomUI.AnounceScore(PointsGathered)
-        for(AwardCustomPlayer:CustomPlayers,AwardPlayer:=AwardCustomPlayer.Player,AwardAgent:=agent[AwardPlayer]):
-            if(PointsGathered>MaxPoints):
-                AwardMaxXP.Award(AwardAgent)
-            else if(PointsGathered>MidPoints):
-                AwardMidXP.Award(AwardAgent)
-            else if(PointsGathered>MinPoints):
-                AwardMinXP.Award(AwardAgent)
-        for(Player:CustomPlayers):
-            set Player.GamesPlayed+=1
-        if(IsAgent:=Agent?):
-            spawn{End(IsAgent)}
-        
-    End(Agent:agent)<suspends>:void=
-        Sleep(10.0)
-        EndGameDevice.Activate(Agent)
+    VotingUIs()<suspends>:void=
+        CustomUI.ShowLevelVoteUI(true,1,false) 
+        CustomUI.CountdownHalfTimeEvent.Await()
+        CustomUI.RemoveSomeHUDS(array{1})
+        CustomUI.ShowDifficultyVoteUI(true,2,false)
 
-    # Difficulty voting
-    CountVotes(WhatEachPlayerVotedMap:[player]difficulty):void=
+    CountLevelVotes(WhatEachPlayerVotedMap:[player]widget,WidgetToLevelMap:[widget]custom_level,SelectedLevelModes:[]custom_level):void=
+        var VoteCountMap:[string]int=map{}
+        var VoteCountArray:[]int=array{}
+        var WinningLevel:string=""
+        var n :int=0
+        var m:int=0
+        Print("Starting counting votes...")
+        for(Player->Widget:WhatEachPlayerVotedMap,LevelMode:=WidgetToLevelMap[Widget]):
+            Print("Checking player votes...")
+            if(M:=VoteCountMap[LevelMode.LevelName],set m=M):
+                set m+=1
+                if(Name:=LevelMode.LevelName?,set VoteCountMap[Name]=m):
+                    Print("Vote towards {Name} counted.")
+            else:
+                if(Name:=LevelMode.LevelName?,set VoteCountMap[Name]=1):
+                    Print("No vote towards {Name} before, counting first vote.")
+        for(LevelName->Count:VoteCountMap):
+            if(Count>=n):
+                Print("Keeping {LevelName} with count: {Count}. n is {n}.")
+                set n = Count
+                set WinningLevel=LevelName
+            else if(Count = 0):
+                Print("{LevelName} got 0 votes.")
+            else:
+                Print("{LevelName} got less votes than another one.")    
+        SelectLevelWinner(WinningLevel,SelectedLevelModes)
+
+    SelectLevelWinner(WinningLevelName:string,SelectedLevels:[]custom_level):void=
+        var WinnerFound:logic=false
+        for(SelectedLevel:SelectedLevels,not WinnerFound?):
+            if(Name:=SelectedLevel.LevelName?,WinningLevelName=Name):
+                Print("{Name} won!!!")
+                set WinnerFound = true
+                SetLevel(SelectedLevel)
+                return
+        n:=GetRandomInt(0,1)
+        Print("{n} selected.")
+        if(WinnerLevel:=SelectedLevels[n],Name:=WinnerLevel.LevelName?):
+            Print("{Name} chosen.")
+            SetLevel(WinnerLevel)
+
+    SetLevel(SelectedLevel:custom_level):void=
+        set CurrentLevel=SelectedLevel
+        SelectedLevel.Start()
+        for(CustomPlayer:CustomPlayers,Player:=CustomPlayer.Player,Agent:=agent[Player]):
+            SelectedLevel.Teleporter.Teleport(Agent)
+
+    CountDifficultyVotes(WhatEachPlayerVotedMap:[player]difficulty):void=
         var VoteCountMap:[string]int=map{}
         var m:int=0
         var n :int=0
         var WinningDifficulty:string=""
+        Print("Counting difficulty votes")
         for(Player->DifficultySelected:WhatEachPlayerVotedMap):
+            Print("First ok")
             if(M:=VoteCountMap[DifficultySelected.DifficultyName],set m=M):
                 set m+=1
                 if(set VoteCountMap[DifficultySelected.DifficultyName]=m):
@@ -213,22 +304,25 @@ Game_Manager := class(creative_device):
                 set n = Count
                 set WinningDifficulty=DifficultyName
             else if(Count = 0):
-                Print("{DifficultyName} got {Count} votes.")   
-        SelectWinner(WinningDifficulty)
+                Print("{DifficultyName} got {Count} votes.")  
+        Print("Difficulty votes counted") 
+        SelectDifficultyWinner(WinningDifficulty)
 
-    SelectWinner(WinningDifficulty:string):void=
+    SelectDifficultyWinner(WinningDifficulty:string):void=
         var WinnerFound:logic=false
-        for(DifficultyOption:DifficultyArray,not WinnerFound?):
+        Print("Selecting Difficulty Winner")
+        for(DifficultyOption:CustomUI.DifficultyArray,not WinnerFound?):
             if(WinnerDifficulty:=WinningDifficulty,WinnerDifficulty=DifficultyOption.DifficultyName):
                 Print("{DifficultyOption.DifficultyName} won!!!")
                 set WinnerFound = true
                 SetDifficulty(DifficultyOption)
                 return
-        if(WinnerDifficulty:=DifficultyArray[1]):
+        if(WinnerDifficulty:=CustomUI.DifficultyArray[1]):
             Print("{WinnerDifficulty.DifficultyName} chosen.")
             SetDifficulty(WinnerDifficulty)
 
     SetDifficulty(SelectedDifficulty:difficulty):void=
+        Print("Adjusting difficulties")
         set FinalTimeToExpireOrder = SelectedDifficulty.ExpireOrder
         set DeliverOrderPointsGranting=SelectedDifficulty.DeliverOrderPoints
 
@@ -244,7 +338,29 @@ Game_Manager := class(creative_device):
         IntroCinematic.SetPlaybackFrame(0)
         IntroCinematic.Play()
 
-    SetUpDifficulties():void=
+    InitLevels():void=
+        Print("")
+        Level1:custom_level=custom_level{
+            LevelName:=option{"Level 1: The Basics"}
+            LevelIcon:=option{Icons.IC_Level1}
+            RecipeIcon:=option{Icons.IC_Pot}
+            LevelTag:=option{level1{}}
+            LevelRandomIngredients:=option{array{Carrot,Chicken,Potato}}
+            StandardSlots:=false
+            MaxIngredients:=3
+            }
+        Level2:custom_level=custom_level{
+            LevelName:=option{"Level 2: Deep Dive"}
+            LevelIcon:=option{Icons.IC_Level2}
+            RecipeIcon:=option{Icons.IC_Sushi}
+            LevelTag:=option{level2{}}
+            LevelRandomIngredients:=option{array{Fish,Cucumber}}
+            StandardSlots:=option{array{Seaweed,Rice}}
+            MaxIngredients:=3
+            }
+        set CustomUI.Levels=array{Level1,Level2}
+
+    InitDifficulties():void=
         set Easy.MinAwardingXP=VerySmallXP
         set Easy.MidAwardingXP=SmallXP
         set Easy.MaxAwardingXP=MediumXP
@@ -254,20 +370,32 @@ Game_Manager := class(creative_device):
         set Hard.MinAwardingXP=MediumXP
         set Hard.MidAwardingXP=LargeXP
         set Hard.MaxAwardingXP=VeryLargeXP
-        set DifficultyArray=array{Easy,Medium,Hard}
+        set CustomUI.DifficultyArray=array{Easy,Medium,Hard}
         set CustomUI.MaxPoints=MinPoints
 
     SetUpItemMeshVFX():void=
         set Plate.Mesh=PlateMesh
-        set Plate.MeshFull=PlateMeshFull
+        if(Name:=CurrentLevel.LevelName?,Name="Level 1: The Basics"):
+            set Plate.MeshFull=PlateMeshFull
+        else:
+            set Plate.MeshFull=PlateMeshFullSushi
         set Plate.MeshDirty=PlateMeshDirty
         set Plate.VFX=PlateVFX
-        set Plate.VFXFull=PlateVFXFull
+        if(LevelTag:=CurrentLevel.LevelTag?):
+            TaggedDevices:=GetCreativeObjectsWithTag(LevelTag)
+            for(Device:TaggedDevices):
+                DeviceTags:=Device.GetTags()
+                if(FullPlateVFX:=visual_effect_powerup_device[Device]):
+                    set Plate.VFXFull=FullPlateVFX
         set Plate.VFXDirty=PlateVFXDirty
         set CookingPot1.SoupMesh=option{Soup}
         set CookingPot1.BellRing=BellRing
-        set CookingPot2.BellRing=BellRing
         set CookingPot2.SoupMesh=option{Soup}
+        set CookingPot2.BellRing=BellRing
+        set CookingPot3.SoupMesh=option{RiceBoiling}
+        set CookingPot3.BellRing=BellRing
+        set CookingPot4.SoupMesh=option{RiceBoiling}
+        set CookingPot4.BellRing=BellRing
         set Carrot.Mesh=CarrotMesh
         set Carrot.MeshChopped=CarrotMeshChopped
         set Carrot.VFX=CarrotVFX
@@ -278,28 +406,35 @@ Game_Manager := class(creative_device):
         set Chicken.VFX=ChickenVFX
         set Chicken.VFXChopped=ChickenVFXChopped
         set Chicken.IconVFX=option{Niagara.NS_IconChicken}
+        set Cucumber.Mesh=CucumberMesh
+        set Cucumber.MeshChopped=CucumberMeshChopped
+        set Cucumber.VFX=CucumberVFX
+        set Cucumber.VFXChopped=CucumberVFXChopped
+        set Cucumber.IconVFX=option{Niagara.NS_IconCarrot}
+        set Fish.Mesh=FishMesh
+        set Fish.MeshChopped=FishMeshChopped
+        set Fish.VFX=FishVFX
+        set Fish.VFXChopped=FishVFXChopped
+        set Fish.IconVFX=option{Niagara.NS_IconCarrot}
         set Potato.Mesh=PotatoMesh
         set Potato.MeshChopped=PotatoMeshChopped
         set Potato.VFX=PotatoVFX
         set Potato.VFXChopped=PotatoVFXChopped
         set Potato.IconVFX=option{Niagara.NS_IconPotato}
-
-    EnableButtons():void=
-        DropInputTrigger.Enable()
-        PickUpInputTrigger.Enable()
-        CarrotButton.Enable()
-        ChickenButton.Enable()
-        PotatoButton.Enable()
-        CuttingBoard1Button.Enable()
-        CuttingBoard2Button.Enable()
-        StoveButton1Button.Enable()
-        StoveButton2Button.Enable()
-        PlateButton.Enable()
-        WaiterDevice.Enable()
-        SinkButton.Enable()
-        TrashcanButton.Enable()
+        set Rice.Mesh=RiceMesh
+        set Rice.MeshChopped=RiceMeshChopped
+        set Rice.VFX=RiceVFX
+        set Rice.VFXChopped=RiceVFXChopped
+        set Rice.IconVFX=option{Niagara.NS_IconPotato}
+        set Seaweed.Mesh=SeaweedMesh
+        set Seaweed.MeshChopped=SeaweedMeshChopped
+        set Seaweed.VFX=SeaweedVFX
+        set Seaweed.VFXChopped=SeaweedVFXChopped
+        set Seaweed.IconVFX=option{Niagara.NS_IconPotato}
 
     ButtonEnabler()<suspends>:void=
+        DropInputTrigger.Enable()
+        PickUpInputTrigger.Enable()
         loop:
             if(RoundEnded?):
                 break
@@ -313,17 +448,74 @@ Game_Manager := class(creative_device):
                 DirtyPlateButton.Disable()
             Sleep(0.5)
 
+    ButtonFunctionality():void=
+        DropInputTrigger.PressedEvent.Subscribe(DropItem)
+        PickUpInputTrigger.PressedEvent.Subscribe(PickUpItem)
+        TaggedDevices:=GetCreativeObjectsWithTag(buttondevice{})
+        for(Device:TaggedDevices):
+            DeviceTags:=Device.GetTags()
+            if(DeviceTags.Has[carrot{}],ButtonCarrot:=button_device[Device]):
+                ButtonCarrot.Enable()
+                ButtonCarrot.InteractedWithEvent.Subscribe(NewItemPickup_Handler{Device:=Self,CustomPlayerArray:=CustomPlayers,Item:=Carrot}.HandlerFunction)
+            if(DeviceTags.Has[chicken{}],ButtonChicken:=button_device[Device]):
+                ButtonChicken.Enable()
+                ButtonChicken.InteractedWithEvent.Subscribe(NewItemPickup_Handler{Device:=Self,CustomPlayerArray:=CustomPlayers,Item:=Chicken}.HandlerFunction)
+            if(DeviceTags.Has[cucumber{}],ButtonCucumber:=button_device[Device]):
+                ButtonCucumber.Enable()
+                ButtonCucumber.InteractedWithEvent.Subscribe(NewItemPickup_Handler{Device:=Self,CustomPlayerArray:=CustomPlayers,Item:=Cucumber}.HandlerFunction)
+            if(DeviceTags.Has[potato{}],ButtonPotato:=button_device[Device]):
+                ButtonPotato.Enable()
+                ButtonPotato.InteractedWithEvent.Subscribe(NewItemPickup_Handler{Device:=Self,CustomPlayerArray:=CustomPlayers,Item:=Potato}.HandlerFunction)
+            if(DeviceTags.Has[rice{}],ButtonRice:=button_device[Device]):
+                ButtonRice.Enable()
+                ButtonRice.InteractedWithEvent.Subscribe(NewItemPickup_Handler{Device:=Self,CustomPlayerArray:=CustomPlayers,Item:=Rice}.HandlerFunction)
+            if(DeviceTags.Has[seaweed{}],ButtonSeaweed:=button_device[Device]):
+                ButtonSeaweed.Enable()
+                ButtonSeaweed.InteractedWithEvent.Subscribe(NewItemPickup_Handler{Device:=Self,CustomPlayerArray:=CustomPlayers,Item:=Seaweed}.HandlerFunction)
+            if(DeviceTags.Has[fishzone{}],ButtonFishZone:=fishing_zone_device[Device]):
+                ButtonFishZone.Enable()
+                ButtonFishZone.CaughtEvent.Subscribe(NewItemPickup_Handler{Device:=Self,CustomPlayerArray:=CustomPlayers,Item:=Fish}.HandlerFunction)
+            if(DeviceTags.Has[cuttingboard{}],ButtonCuttingBoard:=button_device[Device]):
+                ButtonCuttingBoard.Enable()
+                ButtonCuttingBoard.InteractedWithEvent.Subscribe(ChoppingItemInteraction)
+            if(DeviceTags.Has[stove{}],Stove:=button_device[Device]):
+                Stove.Enable()
+                if(DeviceTags.Has[pot1{}],ButtonStove1:=button_device[Device]):
+                    ButtonStove1.InteractedWithEvent.Subscribe(CookingPotInteraction_Handler{Device:=Self,CustomPlayerArray:=CustomPlayers,CookingPot:=CookingPot1}.HandlerFunction)
+                if(DeviceTags.Has[pot2{}],ButtonStove2:=button_device[Device]):
+                    ButtonStove2.InteractedWithEvent.Subscribe(CookingPotInteraction_Handler{Device:=Self,CustomPlayerArray:=CustomPlayers,CookingPot:=CookingPot2}.HandlerFunction)
+                if(DeviceTags.Has[pot3{}],ButtonStove3:=button_device[Device]):
+                    ButtonStove3.InteractedWithEvent.Subscribe(CookingPotInteraction_Handler{Device:=Self,CustomPlayerArray:=CustomPlayers,CookingPot:=CookingPot3}.HandlerFunction)
+                if(DeviceTags.Has[pot4{}],ButtonStove4:=button_device[Device]):
+                    ButtonStove4.InteractedWithEvent.Subscribe(CookingPotInteraction_Handler{Device:=Self,CustomPlayerArray:=CustomPlayers,CookingPot:=CookingPot4}.HandlerFunction)
+            if(DeviceTags.Has[cleanplate{}],ButtonCleanPlate:=button_device[Device]):
+                ButtonCleanPlate.Enable()
+                ButtonCleanPlate.InteractedWithEvent.Subscribe(NewItemPickup_Handler{Device:=Self,CustomPlayerArray:=CustomPlayers,Item:=Plate}.HandlerFunction)
+            if(DeviceTags.Has[dirtyplate{}],ButtonDirtyPlate:=button_device[Device]):
+                ButtonDirtyPlate.Enable()
+                ButtonDirtyPlate.InteractedWithEvent.Subscribe(DirtyPlate)
+            if(DeviceTags.Has[sink{}],ButtonSink:=button_device[Device]):
+                ButtonSink.Enable()
+                ButtonSink.InteractedWithEvent.Subscribe(WashDish)
+            if(DeviceTags.Has[trashcan{}],ButtonTrashCan:=button_device[Device]):
+                ButtonTrashCan.Enable()
+                ButtonTrashCan.InteractedWithEvent.Subscribe(TrashcanInteraction)
+            if(DeviceTags.Has[waiter{}],DeviceWaiter:=character_device[Device]):
+                if(LevelTag:=CurrentLevel.LevelTag?,DeviceTags.Has[LevelTag]):
+                    set WaiterDevice=DeviceWaiter
+                DeviceWaiter.InteractedWithEvent.Subscribe(WaiterInteraction)
+
     PickUpItem(Agent:agent):void=
         if(Player:=player[Agent],CustomPlayer:=CustomPlayers[Player],FortChar:=Agent.GetFortCharacter[],PlayerPosition:=FortChar.GetTransform().Translation):
             var ClosestItemDistance:float=10000.0
             var M:int=-1
-            for(N:=0..DroppedItemsArray.Length-1,DroppedItem:=DroppedItemsArray[N],ItemPosition:=DroppedItem.Position,not CustomPlayer.InventoryFull?):
+            for(N:=0..DroppedItemsArray.Length-1,DroppedItem:=DroppedItemsArray[N],ItemPosition:=DroppedItem.Position,not CustomPlayer.InventoryFull? or (ContainerCarrying:=CustomPlayer.ItemCarrying[0],CarryingPlate:=container[ContainerCarrying])):
                 if(ItemDistance:=Pow((ItemPosition.X - PlayerPosition.X),2.0) + Pow((ItemPosition.Y - PlayerPosition.Y),2.0),ItemDistance<=Pow(PickUpRange,2.0),ItemDistance<ClosestItemDistance):
                     set ClosestItemDistance=ItemDistance
                     set M=N
-            if(ClosestItem:=DroppedItemsArray[M].Item,NewDroppedItemsArray:=DroppedItemsArray.RemoveElement[M],set DroppedItemsArray=NewDroppedItemsArray):
-                ClosestItem.Dispose()
-                CustomPlayer.PickingUpItem(ClosestItem)
+            if(ClosestItem:=DroppedItemsArray[M].Item):
+                ItemPickedUp:=CustomPlayer.PickingUpItem(ClosestItem)
+                if(ItemPickedUp?,NewDroppedItemsArray:=DroppedItemsArray.RemoveElement[M],set DroppedItemsArray=NewDroppedItemsArray){}
 
     DropItem(Agent:agent):void=
         if(Player:=player[Agent],CustomPlayer:=CustomPlayers[Player],Item:=CustomPlayer.ItemCarrying[0]):
@@ -346,44 +538,45 @@ Game_Manager := class(creative_device):
     CookingPotInteraction(Agent:agent,CookingPot:pot):void=
         if(Player:=player[Agent],CustomPlayer:=CustomPlayers[Player],Item:=CustomPlayer.ItemCarrying[0]):
             if(Item.Type="Ingredient",IngredientItem:=ingredient[Item]):
-                IngredientItem.PuttingInPot(CookingPot,CustomPlayer)
+                if(IngredientItem.ItemBoilable?,IngredientItem.Chopped? or not IngredientItem.ItemChoppable?):
+                    CookingPot.Fill(array{IngredientItem},CustomPlayer)
             if(Item.Type="Container",PlateItem:=container[Item]):
                 for(Ingredient:CookingPot.Contains):
-                    Ingredient.PuttingInPlate(CookingPot,PlateItem,CustomPlayer)
+                    PlateItem.Fill(CookingPot.Contains,CustomPlayer)
                 CookingPot.Empty()
                 if(Tick:=CookingPot.SpawnedTickVFX?):
                     Tick.Cancel()
 
     WaiterInteraction(Agent:agent):void=
         if(Player:=player[Agent],CustomPlayer:=CustomPlayers[Player]):
-            if(ItemCarrying:=CustomPlayer.ItemCarrying[0],ItemCarrying.Type="Container",PlateItem:=container[ItemCarrying],PlateItem.Contains.Length=3):
+            if(ItemCarrying:=CustomPlayer.ItemCarrying[0],PlateItem:=container[ItemCarrying],PlateItem.Contains.Length=PlateItem.Size):
                 DeliverOrder(CustomPlayer,PlateItem)
 
     DeliverOrder(CustomPlayer:custom_player,PlateItem:container):void=
-        for(Ingredient:PlateItem.Contains):
-            Print(Ingredient.ItemName)
         var FoundOrder:logic=false
-        for(M:=0..CustomUI.ArrayOfRecipes.Length-1,ExistingRecipe:=CustomUI.ArrayOfRecipes[M],not FoundOrder?):
-            Print("Checkin recipe {M+1}")
-            for(Ingredient:ExistingRecipe.Ingredients):
-                Print(Ingredient.ItemName)
-            var TempPlate:[]ingredient=PlateItem.Contains              
-            for(N:=0..ExistingRecipe.Ingredients.Length,Ingredient:=ExistingRecipe.Ingredients[N]):
-                Print("On recipe {M+1}, checking recipe ingredient {N+1}: {Ingredient.ItemName}")                    
-                for(L:=0..TempPlate.Length-1,TempIngredient:=TempPlate[L]):
-                    Print("Comparing recipe ingredient {N+1}, with plate ingredient {L+1}: {TempIngredient.ItemName}")
-                    if(Ingredient.ItemName=TempIngredient.ItemName,TempIngredient.Boiled?,not TempIngredient.Burnt?):
-                        Print("Ingredient match")
-                        if(NewPlate:=TempPlate.RemoveElement[L]):
-                            set TempPlate = NewPlate
-                if(TempPlate.Length=0):
-                    Print("Order delivered!")
-                    set FoundOrder = true
-                    CustomUI.DisposeRecipe(ExistingRecipe)
-                    for(AwardCustomPlayer:CustomUI.PlayerToCustomPlayerMap,AwardPlayer:=AwardCustomPlayer.Player,AwardAgent:=agent[AwardPlayer]):
-                        SmallXP.Award(AwardAgent)
-                        WaiterDevice.PlayEmote()
-                    ScorePoints()
+        for(K:=0..CustomUI.ArrayOfRecipes.Length-1,OrderRecipe:=CustomUI.ArrayOfRecipes[K],not FoundOrder?):
+            var TempPlate:[int]ingredient=map{}
+            for(L:=0..PlateItem.Contains.Length-1,PlateIngredient:=PlateItem.Contains[L]):
+                if(set TempPlate[L]=PlateIngredient){}
+            for(M:=0..OrderRecipe.Ingredients.Length,Ingredient:=OrderRecipe.Ingredients[M]):
+                var SecondTempPlate:[int]ingredient=map{}
+                var IngredientMatch:logic=false
+                for(Spot->PlateIngredient:TempPlate,not IngredientMatch?):
+                    if(Ingredient.ItemName=PlateIngredient.ItemName,PlateIngredient.Prepared?,not PlateIngredient.Overcooked?):
+                        if(set SecondTempPlate[Spot]=PlateIngredient){}
+                        set IngredientMatch=true
+                for(Spot->PlateIngredient:SecondTempPlate):
+                    var NewTempPlate:[int]ingredient=map{}
+                        for(Key->Value:TempPlate,Key<>Spot):
+                            set NewTempPlate=ConcatenateMaps(NewTempPlate,map{Key=>Value})
+                        set TempPlate=NewTempPlate
+            if(TempPlate.Length=0):
+                set FoundOrder = true
+                CustomUI.DisposeRecipe(OrderRecipe)
+                for(AwardCustomPlayer:CustomUI.PlayerToCustomPlayerMap,AwardPlayer:=AwardCustomPlayer.Player,AwardAgent:=agent[AwardPlayer]):
+                    SmallXP.Award(AwardAgent)
+                    WaiterDevice.PlayEmote()
+                ScorePoints()
         CustomPlayer.DiscardingItem()
         spawn{DirtingPlate(PlateItem)}
     
@@ -414,7 +607,7 @@ Game_Manager := class(creative_device):
         Sleep(5.0)
         BubblesVFX.Disable()
 
-    TrashcanInteraction(Agent:agent):void= #if item is plate empty plate
+    TrashcanInteraction(Agent:agent):void=
         if(Player:=player[Agent],CustomPlayer:=CustomPlayers[Player]):
             if(ItemCarrying:=CustomPlayer.ItemCarrying[0],ItemCarrying.Type="Container",PlateItem:=container[ItemCarrying]):
                 PlateItem.Empty()
@@ -429,17 +622,37 @@ Game_Manager := class(creative_device):
         else if(PointsGathered>=MinPoints):
             set CustomUI.MaxPoints=MidPoints
 
+    CompleteRound(Agent:?agent):void=
+        Print("Round completed, counting game.")
+        set RoundEnded=true
+        BellFinal.Play()
+        DisableButtons()
+        CookingPot1.Empty()
+        CookingPot2.Empty()
+        CookingPot3.Empty()
+        CookingPot4.Empty()
+        CustomUI.AnounceScore(PointsGathered)
+        for(DroppedItem:DroppedItemsArray,Item:=DroppedItem.Item):
+            Item.Dispose()
+        set DroppedItemsArray=array{}
+        for(AwardCustomPlayer:CustomPlayers,AwardPlayer:=AwardCustomPlayer.Player,AwardAgent:=agent[AwardPlayer]):
+            if(PointsGathered>MaxPoints):
+                AwardMaxXP.Award(AwardAgent)
+            else if(PointsGathered>MidPoints):
+                AwardMidXP.Award(AwardAgent)
+            else if(PointsGathered>MinPoints):
+                AwardMinXP.Award(AwardAgent)
+        for(Player:CustomPlayers):
+            Player.DiscardingItem()
+            set Player.GamesPlayed+=1
+        if(IsAgent:=Agent?):
+            spawn{End(IsAgent)}
+        
+    End(Agent:agent)<suspends>:void=
+        Sleep(10.0)
+        EndGameDevice.Activate(Agent)
+
     DisableButtons():void=
-        DropInputTrigger.Disable()
-        PickUpInputTrigger.Disable()
-        CarrotButton.Disable()
-        ChickenButton.Disable()
-        PotatoButton.Disable()
-        CuttingBoard1Button.Disable()
-        CuttingBoard2Button.Disable()
-        StoveButton1Button.Disable()
-        StoveButton2Button.Disable()
-        PlateButton.Disable()
-        WaiterDevice.Disable()
-        SinkButton.Disable()
-        TrashcanButton.Disable()
+        TaggedDevices:=GetCreativeObjectsWithTag(buttondevice{})
+        for(Device:TaggedDevices):
+            if(Button:=button_device[Device]) then Button.Disable()
