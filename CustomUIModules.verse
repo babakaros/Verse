@@ -7,6 +7,7 @@ using { /UnrealEngine.com/Temporary/SpatialMath }
 using { /UnrealEngine.com/Temporary/UI }
 using { /Verse.org/Assets }
 using { /Verse.org/Colors/NamedColors }
+using { /Verse.org/Concurrency }
 using { /Verse.org/Random }
 using { /Verse.org/Simulation }
 using { /Verse.org/Simulation/Tags }
@@ -20,10 +21,8 @@ custom_ui_creator:=class():
     var PlayerToCustomPlayerMap:[player]custom_player 
     var PlayerToCanvasMap:[player][int]?canvas=map{}
     var DefaultCanvas:canvas=canvas{}
-    var MyCanvasSlot:canvas_slot=canvas_slot{Widget:=canvas{}}
     
     Assign():void=
-        Print("Starting UI assignment.")
         var n : int = 1
         for(Player->CustomPlayer:PlayerToCustomPlayerMap):
             Print("Player {n} found")
@@ -31,23 +30,19 @@ custom_ui_creator:=class():
             Base(Player)
 
     AppearUI<private>(Interactable:logic,Order:int,Player:player,CanvasSlot:canvas_slot):void=
+        var ZOrder:type {_X:int where 0 <= _X, _X <= 2147483647}=0
+        if(TempOrder:=type {_X:int where 0 <= _X, _X <= 2147483647}[Order],set ZOrder=TempOrder){}
         if(CustomPlayer:=PlayerToCustomPlayerMap[Player]):
-            set MyCanvasSlot=CanvasSlot
-            case(Interactable):
-                true=>
-                    if(PlayerUI:=GetPlayerUI[Player]):
-                        MyCanvas:=canvas{}
-                        PlayerUI.AddWidget(MyCanvas,player_ui_slot{ZOrder:=0,InputMode:=ui_input_mode.All})
-                        MyCanvas.AddWidget(MyCanvasSlot)
-                        if(set PlayerToCanvasMap[Player][Order]=option{MyCanvas}):
-                            Print("Done")
-                _=>
-                    if(PlayerUI:=GetPlayerUI[Player]):
-                        MyCanvas:=canvas{}
-                        PlayerUI.AddWidget(MyCanvas,player_ui_slot{ZOrder:=0,InputMode:=ui_input_mode.None})
-                        MyCanvas.AddWidget(MyCanvasSlot)
-                        if(set PlayerToCanvasMap[Player][Order]=option{MyCanvas}):
-                            Print("Done")
+            if(PlayerUI:=GetPlayerUI[Player]):
+                MyCanvas:=canvas{}
+                case(Interactable):
+                    true=>
+                            PlayerUI.AddWidget(MyCanvas,player_ui_slot{ZOrder:=ZOrder,InputMode:=ui_input_mode.All}) 
+                    _=>
+                            PlayerUI.AddWidget(MyCanvas,player_ui_slot{ZOrder:=ZOrder,InputMode:=ui_input_mode.None})
+                MyCanvas.AddWidget(CanvasSlot)
+                if(set PlayerToCanvasMap[Player][Order]=option{MyCanvas}):
+                    Print("Canvas num {Order} added to map.")
 
     Base<private>(Player:player):void=
         if(PlayerUI:=GetPlayerUI[Player]):
@@ -81,20 +76,24 @@ custom_ui_creator:=class():
         if(Player:=player[Agent],PlayerUI:=GetPlayerUI[Player],PlayerWidget:=PlayerToCanvasMap[Player][Order]?):
             PlayerUI.RemoveWidget(PlayerWidget)
 
-    RemoveSomeHUDS(OrderArray:[]int):void=
-        for(Player->CustomPlayer:PlayerToCanvasMap):
+    RemoveSomeHUDS(UIOrderArray:[]int):void=
+        for(Player->CustomPlayer:PlayerToCustomPlayerMap):
             if(PlayerUI:=GetPlayerUI[Player]):
-                for(N:OrderArray,PlayerWidget:=PlayerToCanvasMap[Player][N]?):
+                for(N:UIOrderArray,PlayerWidget:=PlayerToCanvasMap[Player][N]?):
+                    Print("Removing widget {N}")
                     PlayerUI.RemoveWidget(PlayerWidget)
-                if(NewPTCM:=map{},set PlayerToCanvasMap[Player]=NewPTCM){}
+                    var NewMap:[int]?canvas=map{}
+                    for(M->L:PlayerToCanvasMap[Player],M<>N):
+                        set NewMap = ConcatenateMaps(NewMap,map{M=>L})
+                    if(set PlayerToCanvasMap[Player]=NewMap){}
 
     RemoveAllHUDS():void=
-        for(Player->CustomPlayer:PlayerToCanvasMap):
+        for(Player->CustomPlayer:PlayerToCustomPlayerMap):
             if(PlayerUI:=GetPlayerUI[Player]):
                 for(N:=0..PlayerToCanvasMap[Player].Length-1,PlayerWidget:=PlayerToCanvasMap[Player][N]?):
                     PlayerUI.RemoveWidget(PlayerWidget)
                 if(NewPTCM:=map{},set PlayerToCanvasMap[Player]=NewPTCM){}
-###############################################################################################
+###################################################################################################################################################################################################
 
 
 ##########################
@@ -254,25 +253,22 @@ custom_ui_creator:=class():
 ##########################
     var CountdownTimerOrder<private>:int=0
     var TotalTimer<private>:float=15.0
+    var TotalTimer<private>:float=0.0
     var CountdownText<private>:string=""
+    CountdownHalfTimeEvent<public> : event(float) = event(float){}
     CountdownEndedEvent<public> : event(float) = event(float){}
     var Time<private>:float=10000.0
 
-    ShowCustomTimerUI(Interactable:logic,Order:int,Agent:?agent,CountdownTime:float,PreviewText:string):void=
-        set CountdownTimerOrder=Order
-        set TotalTimer=CountdownTime
-        set CountdownText=PreviewText
-        if(TrueAgent:=Agent?):
-            if(Player:=player[TrueAgent]):
-                AppearUI(Interactable,Order,Player,CTCanvasSlot())
-        else:
-            for(Player->CustomPlayer:PlayerToCustomPlayerMap):
+@@ -118,8 +118,10 @@ custom_ui_creator:=class():
                 AppearUI(Interactable,Order,Player,CTCanvasSlot())
 
     CTCanvasSlot<private>():canvas_slot=
+        var IntTime:int=0
+        if(TempInt:=Round[TotalTimer],set IntTime=TempInt){}
         RemainingTimeTextBlock:text_block=text_block:
             DefaultText:=StringToMessage(CountdownText+"30")
-            DefaultTextColor:=Chocolate
+            DefaultText:=StringToMessage("{CountdownText}{IntTime}")
+            DefaultTextColor:=CadetBlue
             DefaultShadowColor:=Black
             DefaultShadowOffset:=option{vector2{X:=3.0,Y:=3.0}}
         RemainingTimeTextBlock.SetShadowOpacity(1.0)
@@ -301,8 +297,8 @@ custom_ui_creator:=class():
         CountdownTimerSlot:=canvas_slot:
             Widget:=TimerCanvas
             Anchors := anchors:
-                Minimum := vector2{X := 0.5, Y := 0.8}
-                Maximum := vector2{X := 0.5, Y := 0.8}
+                Minimum := vector2{X := 0.5, Y := 0.11}
+                Maximum := vector2{X := 0.5, Y := 0.11}
             Alignment := vector2{X := 0.5, Y := 0.5 }
             Offsets := margin{Top := 0.0, Left := 0.0, Bottom := 0.0, Right := 0.0}
             SizeToContent := true     
@@ -322,6 +318,9 @@ custom_ui_creator:=class():
             UpdateUI(TextBlock,TimeLeft)
             if (TimeLeft <= 0.0):
                 Print("Time ended!")
+            if(TimeLeft<=(TotalTimer/2.0)):
+                CountdownHalfTimeEvent.Signal(TotalTime)
+            if(TimeLeft <= 0.0):
                 CountdownEndedEvent.Signal(TotalTime)
                 break
 
@@ -337,104 +336,52 @@ custom_ui_creator:=class():
 ### Difficulty Vote UI###
 #########################
     var DifficultyVoteOrder<private>:int=0
-    var PlayerVotes<private>:[player]difficulty=map{}
+    var PlayerVotes:[player]difficulty=map{}
     var DifficultyArray<private>:[]difficulty=array{}
+    var PlayerDifficultyVotes:[player]difficulty=map{}
+    var DifficultyArray:[]difficulty=array{}
 
     ShowDifficultyVoteUI(Interactable:logic,Order:int,Agent:?agent,SelectedDifficultyArray:[]difficulty):void=
+    ShowDifficultyVoteUI(Interactable:logic,Order:int,Agent:?agent):void=
         set DifficultyVoteOrder=Order
         set DifficultyArray=SelectedDifficultyArray
         if(TrueAgent:=Agent?):
-            if(Player:=player[TrueAgent]):
-                AppearUI(Interactable,Order,Player,DVCanvasSlot())
-        else:
-            for(Player->CustomPlayer:PlayerToCustomPlayerMap):
-                AppearUI(Interactable,Order,Player,DVCanvasSlot())
-    
-    DVCanvasSlot<private>():canvas_slot=
-        EasyButton:button_regular=button_regular{}
-        EasyButton.SetText(StringToMessage("Easy"))
-        EasyButton.OnClick().Subscribe(DifficultyButton_Handler{DifficultyUI:=Self,Difficulty:="Easy"}.HandlerFunction)
-        MediumButton:button_regular=button_regular{}
-        MediumButton.SetText(StringToMessage("Medium"))
-        MediumButton.OnClick().Subscribe(DifficultyButton_Handler{DifficultyUI:=Self,Difficulty:="Medium"}.HandlerFunction)
-        HardButton:button_regular=button_regular{}
-        HardButton.SetText(StringToMessage("Hard"))
-        HardButton.OnClick().Subscribe(DifficultyButton_Handler{DifficultyUI:=Self,Difficulty:="Hard"}.HandlerFunction)
+            if(Player:=player[TrueAgent],CustomPlayer:=PlayerToCustomPlayerMap[Player]):
+                AppearUI(Interactable,Order,Player,DVCanvasSlot(CustomPlayer))
+@@ -210,7 +212,7 @@ custom_ui_creator:=class():
+        HardButton.OnClick().Subscribe(DifficultyButton_Handler{CustomUI:=Self,Difficulty:="Hard"}.HandlerFunction)
         SubmitButton := button_loud:
             DefaultText:=StringToMessage("Submit")
         SubmitButton.OnClick().Subscribe(ExitVote)
+        SubmitButton.OnClick().Subscribe(ExitDVote)
 
         DifficultyUIOptionsStack := stack_box:
             Orientation := orientation.Vertical
-            Slots := array:
-                stack_box_slot:
-                    Widget:=texture_block:
-                        DefaultImage:=Icons.IC_SelectDifficulty
-                        DefaultDesiredSize:=vector2{X:=361.9,Y:=220.0}
-                    HorizontalAlignment:=horizontal_alignment.Center
-                    VerticalAlignment:=vertical_alignment.Center
-                    Padding:=margin{Top:=7.0,Left:=0.0,Bottom:=0.0,Right:=0.0}
-                stack_box_slot:
-                    Widget:=EasyButton
-                    HorizontalAlignment:=horizontal_alignment.Center
-                    VerticalAlignment:=vertical_alignment.Center
-                    Padding:=margin{Top:=30.0,Left:=0.0,Bottom:=0.0,Right:=0.0}
-                stack_box_slot:
-                    Widget:=MediumButton
-                    HorizontalAlignment:=horizontal_alignment.Center
-                    VerticalAlignment:=vertical_alignment.Center
-                    Padding:=margin{Top:=25.0,Left:=0.0,Bottom:=0.0,Right:=0.0}
-                stack_box_slot:
-                    Widget:=HardButton
-                    HorizontalAlignment:=horizontal_alignment.Center
-                    VerticalAlignment:=vertical_alignment.Center
-                    Padding:=margin{Top:=25.0,Left:=0.0,Bottom:=20.0,Right:=0.0}
-                stack_box_slot:
-                    Widget:=SubmitButton    
-                    HorizontalAlignment:=horizontal_alignment.Center
-                    VerticalAlignment:=vertical_alignment.Center
-                    Padding:=margin{Top:=65.0,Left:=0.0,Bottom:=80.0,Right:=0.0}
-        DifficultyUICanvas:canvas = canvas:
-            Slots:=array:
-                canvas_slot:
-                    Widget:=DifficultyUIOptionsStack
-                    Anchors:=anchors{Minimum:=vector2{X:=0.5,Y:=0.5},Maximum:=vector2{X:=0.5,Y:=0.5}}
-                    Offsets:=margin{Top:=0.0,Left:=0.0,Bottom:=0.0,Right:=0.0}
-                    SizeToContent:=true
-                    Alignment:=vector2{X:=0.5,Y:=0.5}
-                    ZOrder:=1
-                canvas_slot:
-                    Widget:=texture_block:
-                        DefaultImage:=Icons.IC_DifficultyBG
-                        DefaultDesiredSize := vector2{X := 400.0, Y := 700.0}
-                    Anchors:=anchors{Minimum:=vector2{X:=0.5,Y:=0.5},Maximum:=vector2{X:=0.5,Y:=0.5}}
-                    Offsets:=margin{Top:=0.0,Left:=0.0,Bottom:=0.0,Right:=0.0}
-                    SizeToContent:=true
-                    Alignment:=vector2{X:=0.5,Y:=0.475}
-                    ZOrder:=0
-        VotingUICanvasSlot:=canvas_slot:
-            Widget:=DifficultyUICanvas
-            Anchors := anchors:
-                Minimum := vector2{X := 0.5, Y := 0.5}
-                Maximum := vector2{X := 0.5, Y := 0.5}
-            Alignment := vector2{X := 0.5, Y := 0.5 }
+@@ -269,20 +271,18 @@ custom_ui_creator:=class():
             Offsets := margin{Top := 0.0, Left := 0.0, Bottom := 0.0, Right := 0.0}
             SizeToContent := true
             ZOrder:=1
+        if(Player:=CustomPlayer.Player,Agent:=agent[Player]):
+            ShowCustomTimerUI(false,2,option{Agent},15.0,"")
         return VotingUICanvasSlot
 
-    DifficultyVote<private>(Difficulty:string,Wdata:widget_message):void=
+    DifficultyVote(Difficulty:string,Wdata:widget_message):void=
         if(Difficulty="Easy"):
             if(Easy:=DifficultyArray[0], set PlayerVotes[Wdata.Player]=Easy){}
+            if(Easy:=DifficultyArray[0], set PlayerDifficultyVotes[Wdata.Player]=Easy){}
         if(Difficulty="Medium"):
             if(Medium:=DifficultyArray[1], set PlayerVotes[Wdata.Player]=Medium){}
+            if(Medium:=DifficultyArray[1], set PlayerDifficultyVotes[Wdata.Player]=Medium){}
         if(Difficulty="Hard"):
             if(Hard:=DifficultyArray[2], set PlayerVotes[Wdata.Player]=Hard){}
+            if(Hard:=DifficultyArray[2], set PlayerDifficultyVotes[Wdata.Player]=Hard){}
         Print("{Difficulty}")
 
     ExitVote<private>(Wdata:widget_message):void=
+    ExitDVote<private>(Wdata:widget_message):void=
         if(Player:=Wdata.Player,Agent:=agent[Player]):
             RemovePlayerHUD(Agent,DifficultyVoteOrder)
+            RemovePlayerHUD(Agent,CountdownTimerOrder)
 ##############################
 ### Difficulty Vote UI End ###
 ##############################
@@ -664,114 +611,277 @@ AnounceScore(PointsGotten:int):void=
 ##############################
 
 
+##########################
+### Level Selection UI ###
+##########################
+    var LevelVoteOrder<private>:int=0
+    var Levels:[]custom_level=array{}
+    var SelectedLevels:[]custom_level=array{}
+    var PlayerLevelVotes:[player]widget=map{}
+    var WidgetToLevelMap:[widget]custom_level=map{}
+    var ChooseLevelsEndedEvent<public>:event()=event(){}
+    var LevelsSelected:logic=false
+
+    ShowLevelVoteUI(Interactable:logic,Order:int,Agent:?agent):void=
+        set LevelVoteOrder=Order
+        if(TrueAgent:=Agent?):
+            if(Player:=player[TrueAgent],CustomPlayer:=PlayerToCustomPlayerMap[Player]):
+                AppearUI(Interactable,Order,Player,LSCanvasSlot(CustomPlayer))
+        else:
+            for(Player->CustomPlayer:PlayerToCustomPlayerMap):
+                AppearUI(Interactable,Order,Player,LSCanvasSlot(CustomPlayer))
+
+    LSCanvasSlot<private>(CustomPlayer:custom_player):canvas_slot=
+        ChooseLevels()
+        loop:
+            if(LevelsSelected?):
+                break
+        if(Player:=CustomPlayer.Player,Agent:=agent[Player]):
+                ShowCustomTimerUI(false,3,option{Agent},20.0,"")
+
+        SubmitButton := button_loud:
+            DefaultText:=StringToMessage("Submit")
+        SubmitButton.OnClick().Subscribe(ExitLVote)
+
+        for(Level:SelectedLevels):
+            spawn:
+                LevelButtonsAwait(Level)
+
+        if(Level1:custom_level=SelectedLevels[0],Level2:custom_level=SelectedLevels[1]):
+            VotingOptionsStack := stack_box:
+                Orientation := orientation.Horizontal
+                Slots := array:
+                    stack_box_slot:
+                        Widget := Level1.StackBoxCreator()
+                        HorizontalAlignment:=horizontal_alignment.Center
+                        VerticalAlignment:=vertical_alignment.Center
+                        Padding:=margin{Top:=0.0,Left:=25.0,Bottom:=0.0,Right:=25.0}
+                    stack_box_slot:
+                        Widget := Level2.StackBoxCreator()
+                        HorizontalAlignment:=horizontal_alignment.Center
+                        VerticalAlignment:=vertical_alignment.Center
+                        Padding:=margin{Top:=0.0,Left:=25.0,Bottom:=0.0,Right:=25.0}
+            VotingUICanvas:canvas = canvas:
+                Slots:=array:
+                    canvas_slot:
+                        Widget:=texture_block:
+                            DefaultImage:=Icons.IC_SelectLevel
+                            DefaultDesiredSize:=vector2{X:=369.0,Y:=230.0}
+                        Anchors := anchors:
+                            Minimum := vector2{X := 0.5, Y := 0.055}
+                            Maximum := vector2{X := 0.5, Y := 0.055}
+                        Alignment := vector2{X := 0.5, Y := 0.5}
+                        Offsets := margin{Top := 0.0, Left := 0.0, Bottom := 0.0, Right := 0.0}
+                        SizeToContent := true
+                        ZOrder:=3
+                    canvas_slot:
+                        Widget:=SubmitButton    
+                        Anchors := anchors:
+                            Minimum := vector2{X := 0.5, Y := 0.9}
+                            Maximum := vector2{X := 0.5, Y := 0.9}
+                        Alignment := vector2{X := 0.5, Y := 0.5}
+                        Offsets := margin{Top := 0.0, Left := 0.0, Bottom := 0.0, Right := 0.0}
+                        SizeToContent := true
+                        ZOrder:=2
+                    canvas_slot:
+                        Widget:=VotingOptionsStack
+                        Anchors:=anchors{Minimum:=vector2{X:=0.5,Y:=0.5},Maximum:=vector2{X:=0.5,Y:=0.5}}
+                        Offsets:=margin{Top:=0.0,Left:=0.0,Bottom:=0.0,Right:=0.0}
+                        SizeToContent:=true
+                        Alignment:=vector2{X:=0.5,Y:=0.5}
+                        ZOrder:=1
+                    canvas_slot:
+                        Widget:=texture_block:
+                            DefaultImage:=Icons.IC_DifficultyBG
+                            DefaultDesiredSize:=vector2{X:=800.0,Y:=700.0}
+                        Anchors:=anchors{Minimum:=vector2{X:=0.5,Y:=0.52},Maximum:=vector2{X:=0.5,Y:=0.52}}
+                        Offsets:=margin{Top:=0.0,Left:=0.0,Bottom:=0.0,Right:=0.0}
+                        SizeToContent:=true
+                        Alignment:=vector2{X:=0.5,Y:=0.5}
+                        ZOrder:=0
+            VotingUICanvasSlot:=canvas_slot:
+                Widget:=VotingUICanvas
+                Anchors := anchors:
+                    Minimum := vector2{X := 0.5, Y := 0.5}
+                    Maximum := vector2{X := 0.5, Y := 0.5}
+                Alignment := vector2{X := 0.5, Y := 0.5 }
+                Offsets := margin{Top := 0.0, Left := 0.0, Bottom := 0.0, Right := 0.0}
+                SizeToContent := true
+                ZOrder:=1
+            return VotingUICanvasSlot
+        EmptyCanvasSlot:=canvas_slot{Widget:=canvas{}}
+        return EmptyCanvasSlot
+
+    ChooseLevels():void=
+        var SelectedNumbers:[]int=array{}
+        var LevelIndex:int=0
+        var InIndex:logic=false
+        var Iteration:int=1
+
+        loop:
+            if(SelectedNumbers.Length=2):           
+                break
+            set Iteration=Iteration+1
+            set LevelIndex=GetRandomInt(0,Levels.Length-1)
+            if(SelectedNumbers.Length=0):
+                set SelectedNumbers=SelectedNumbers+array{LevelIndex}
+            else:
+                for (Num := 0..SelectedNumbers.Length - 1,not InIndex?):
+                    if(LevelIndex=SelectedNumbers[Num]):
+                        set InIndex = true
+                    if(LevelIndex<>SelectedNumbers[Num],Num=SelectedNumbers.Length-1):
+                        set SelectedNumbers=SelectedNumbers+array{LevelIndex}
+                set InIndex = false
+        if:
+            TempLevel1:custom_level=Levels[SelectedNumbers[0]]
+            TempLevel2:custom_level=Levels[SelectedNumbers[1]]
+        then:           
+            set SelectedLevels += array{TempLevel1,TempLevel2}
+        set LevelsSelected=true
+
+    LevelButtonsAwait<private>(Level:custom_level)<suspends>:void=
+        Level.ButtonClickedEvent.Await()
+        if(Widget:widget_message=Level.WdataArray[0],set WidgetToLevelMap[Widget.Source]=Level):
+            SubmitVote(Widget)
+        spawn{LevelButtonsAwait(Level)} # because it's retriggable
+
+    SubmitVote<private>(Wdata:widget_message):void=
+        if(set PlayerLevelVotes[Wdata.Player]=Wdata.Source):
+            Print("Player vote added to map.")
+
+    ExitLVote<private>(Wdata:widget_message):void=
+        if(Player:=Wdata.Player,Agent:=agent[Player]):
+            RemovePlayerHUD(Agent,LevelVoteOrder)
+##############################
+### Level Selection UI End ###
+##############################
+
+
 ################
 ### Order UI ###
 ################
-var OrderOrder<private>:int=0
-var TimeBetweenOrders<private>:float=0.0
-var TimeToExpireOrder<private>:float=0.0
-var ArrayOfRecipes:[]recipe=array{}
-var PlayerToOrderStackMap<private>:[player]stack_box=map{}
-var RecipeCanvasToUniqueIDMap<private>:[canvas]int=map{}
-var RecipeUniqueID:int=0
+    var OrderOrder<private>:int=0
+    var RecipeIcon:texture=Icons.IC_MapCode
+    var TimeBetweenOrders<private>:float=0.0
+    var TimeToExpireOrder<private>:float=0.0
+    var ArrayOfRecipes:[]recipe=array{}
+    var PlayerToOrderStackMap<private>:[player]stack_box=map{}
+    var RecipeCanvasToUniqueIDMap<private>:[canvas]int=map{}
+    var RecipeUniqueID:int=0
+    var StandardIngredientOrder<private>:?[]ingredient=false
+    var MaximumIngredients<private>:int=3
 
-ShowOrderUI(Interactable:logic,Order:int,Agent:?agent,SelectedTimeBetweenOrders:float,SelectedTimeToExpreOrder:float):void=
-    set OrderOrder=Order
-    set TimeBetweenOrders=SelectedTimeBetweenOrders
-    set TimeToExpireOrder=SelectedTimeToExpreOrder
-    if(TrueAgent:=Agent?):
-        if(Player:=player[TrueAgent],CustomPlayer:=PlayerToCustomPlayerMap[Player]):
-            AppearUI(Interactable,Order,Player,OCanvasSlot(CustomPlayer))
-    else:
-        for(Player->CustomPlayer:PlayerToCustomPlayerMap):
-            AppearUI(Interactable,Order,Player,OCanvasSlot(CustomPlayer))
+    ShowOrderUI(Interactable:logic,Order:int,Agent:?agent,SelectedTimeBetweenOrders:float,SelectedTimeToExpreOrder:float):void=
+        set OrderOrder=Order
+        set TimeBetweenOrders=SelectedTimeBetweenOrders
+        set TimeToExpireOrder=SelectedTimeToExpreOrder
+        if(TrueAgent:=Agent?):
+            if(Player:=player[TrueAgent],CustomPlayer:=PlayerToCustomPlayerMap[Player]):
+                AppearUI(Interactable,Order,Player,OCanvasSlot(CustomPlayer))
+        else:
+            for(Player->CustomPlayer:PlayerToCustomPlayerMap):
+                AppearUI(Interactable,Order,Player,OCanvasSlot(CustomPlayer))
 
-OrderFood(Interactable:logic,Order:int,Agent:?agent,PossibleItems:[]ingredient,SelectedTimeBetweenOrders:float,SelectedTimeToExpreOrder:float)<suspends>:void=
-    ShowOrderUI(Interactable,Order,false,SelectedTimeBetweenOrders,SelectedTimeToExpreOrder)
-    loop:
-        if(ArrayOfRecipes.Length<5):
-            set ArrayOfRecipes+=array{AssignRecipe(PossibleItems)}
-        Print("Current Running Orders: {ArrayOfRecipes.Length}")
-        Sleep(TimeBetweenOrders)
+    OrderFood(Interactable:logic,Order:int,Agent:?agent,PossibleItems:[]ingredient,SelectedTimeBetweenOrders:float,SelectedTimeToExpreOrder:float)<suspends>:void=
+    OrderFood(Interactable:logic,Order:int,Agent:?agent,PossibleItems:[]ingredient,StandardSlots:?[]ingredient,MaxIngredients:int,IconRecipe:texture,SelectedTimeBetweenOrders:float,SelectedTimeToExpreOrder:float)<suspends>:void=
+        ShowOrderUI(Interactable,Order,false,SelectedTimeBetweenOrders,SelectedTimeToExpreOrder)
+        set StandardIngredientOrder=StandardSlots
+        set MaximumIngredients=MaxIngredients
+        set RecipeIcon=IconRecipe
+        loop:
+            if(ArrayOfRecipes.Length<5):
+                set ArrayOfRecipes+=array{AssignRecipe(PossibleItems)}
+            Print("Current Running Orders: {ArrayOfRecipes.Length}")
+            Sleep(TimeBetweenOrders)
 
-OCanvasSlot(CustomPlayer:custom_player):canvas_slot=
-    AnchorX:=0.98
-    AnchorY:=0.05
-    TotalOrdersStack:stack_box=stack_box{Orientation:=orientation.Vertical}
-    OrderCanvasSlot:=canvas_slot:
-        Widget:=TotalOrdersStack
-        Anchors := anchors:
-            Minimum := vector2{X:=AnchorX,Y:=AnchorY}
-            Maximum := vector2{X:=AnchorX,Y:=AnchorY}
-        Alignment := vector2{X := 1.0, Y := 0.0 }
-        Offsets := margin{}
-        SizeToContent := true     
-        ZOrder:=9
-    if(set PlayerToOrderStackMap[CustomPlayer.Player]=TotalOrdersStack){}
-    return OrderCanvasSlot
+    OCanvasSlot(CustomPlayer:custom_player):canvas_slot=
+        AnchorX:=0.98
+        AnchorY:=0.05
+        TotalOrdersStack:stack_box=stack_box{Orientation:=orientation.Vertical}
+        OrderCanvasSlot:=canvas_slot:
+            Widget:=TotalOrdersStack
+            Anchors := anchors:
+                Minimum := vector2{X:=AnchorX,Y:=AnchorY}
+                Maximum := vector2{X:=AnchorX,Y:=AnchorY}
+            Alignment := vector2{X := 1.0, Y := 0.0 }
+            Offsets := margin{}
+            SizeToContent := true     
+            ZOrder:=9
+        if(set PlayerToOrderStackMap[CustomPlayer.Player]=TotalOrdersStack){}
+        return OrderCanvasSlot
 
-AssignRecipe<private>(PossibleItems:[]ingredient):recipe=
-    Recipe:=recipe{MaxTime:=TimeToExpireOrder,RecipeUniqueID:=RecipeUniqueID}
-    for(M:=0..2):
-        if(set Recipe.Ingredients+=array{PossibleItems[GetRandomInt(0,2)]}){}    
-    for(Player->OrderStack:PlayerToOrderStackMap):
-        IngredientStack:stack_box=stack_box:
-            Orientation := orientation.Vertical
-        for(N:=0..Recipe.Ingredients.Length-1):
-            if(CurrentIngredient:=Recipe.Ingredients[N]):
-                IngredientBGTextureBlock := texture_block:
-                    DefaultImage:= Icons.IC_OrderIngredientBG  
-                    DefaultDesiredSize := vector2{X := 50.0, Y := 50.0}  
-                IngredientTextureBlock := texture_block:
-                    DefaultImage:= CurrentIngredient.ItemIcon  
-                    DefaultDesiredSize := vector2{X := 100.0, Y := 90.0}
-                IngredientCanvas:canvas=canvas:
-                    Slots:=array:
-                        canvas_slot:
-                            Widget:=IngredientTextureBlock
-                            Anchors:=anchors{Minimum:=vector2{X:=0.5,Y:=0.5},Maximum:=vector2{X:=0.5,Y:=0.5}}
-                            Offsets:=margin{Top:=0.0,Left:=0.0,Bottom:=0.0,Right:=0.0}
-                            SizeToContent:=true
-                            Alignment:=vector2{X:=0.5,Y:=0.5}
-                            ZOrder:=1
-                        canvas_slot:
-                            Widget:=IngredientBGTextureBlock
-                            Anchors:=anchors{Minimum:=vector2{X:=0.5,Y:=0.5},Maximum:=vector2{X:=0.5,Y:=0.5}}
-                            Offsets:=margin{Top:=0.0,Left:=0.0,Bottom:=0.0,Right:=0.0}
-                            SizeToContent:=true
-                            Alignment:=vector2{X:=0.5,Y:=0.5}
-                            ZOrder:=0
-                IngredientSlot:=stack_box_slot:
-                    Widget:=IngredientCanvas
-                    HorizontalAlignment:=horizontal_alignment.Center
-                    VerticalAlignment:=vertical_alignment.Center
-                IngredientStack.AddWidget(IngredientSlot)
-        RecipeCanvas:=Recipe.MakeRecipeCanvas(IngredientStack)
-        if(set RecipeCanvasToUniqueIDMap[RecipeCanvas]=RecipeUniqueID):
-        OrderStackSlot:=stack_box_slot:
-            Widget:=RecipeCanvas
-            HorizontalAlignment:=horizontal_alignment.Left
-            VerticalAlignment:=vertical_alignment.Bottom
-        OrderStack.AddWidget(OrderStackSlot)
-    spawn{RecipeTimedOut(Recipe)}
-    spawn{Recipe.KillRecipe()}
-    set RecipeUniqueID+=1
-    return Recipe
-
-RecipeTimedOut<private>(Recipe:recipe)<suspends>:void=
-    Recipe.TimeOutEvent.Await()
-    Print("Time's up")
-    DisposeRecipe(Recipe)
-    spawn{RecipeTimedOut(Recipe)}
-
-DisposeRecipe(ExpiredRecipe:recipe):void=
-    UniqueID:=ExpiredRecipe.RecipeUniqueID
-    for(Recipe->ID:RecipeCanvasToUniqueIDMap,ID=ExpiredRecipe.RecipeUniqueID):
+    AssignRecipe<private>(PossibleItems:[]ingredient):recipe=
+        Recipe:=recipe{MaxTime:=TimeToExpireOrder,RecipeUniqueID:=RecipeUniqueID}
+        for(M:=0..2):
+            if(set Recipe.Ingredients+=array{PossibleItems[GetRandomInt(0,2)]}){}    
+        Recipe:=recipe{MaxTime:=TimeToExpireOrder,RecipeUniqueID:=RecipeUniqueID,RecipeIcon:=RecipeIcon}
+        if(not StandardIngredientOrder?):
+            for(M:=0..MaximumIngredients-1):
+                if(set Recipe.Ingredients+=array{PossibleItems[GetRandomInt(0,PossibleItems.Length-1)]}){}   
+        else:
+            if(IngredientOrder:=StandardIngredientOrder?):
+                for(Ingredient:IngredientOrder):
+                    set Recipe.Ingredients+=array{Ingredient}
+                for(Remaining:=0..(MaximumIngredients-Recipe.Ingredients.Length-1)):
+                    if(set Recipe.Ingredients+=array{PossibleItems[GetRandomInt(0,PossibleItems.Length-1)]}){}
         for(Player->OrderStack:PlayerToOrderStackMap):
-            OrderStack.RemoveWidget(Recipe)
-    for(M:=0..ArrayOfRecipes.Length-1,ExistingRecipe:=ArrayOfRecipes[M]):
-        if(ExpiredRecipe=ExistingRecipe):
-            if(NewArrayOfRecipes:=ArrayOfRecipes.RemoveElement[M],set ArrayOfRecipes=NewArrayOfRecipes){}
+            IngredientStack:stack_box=stack_box:
+                Orientation := orientation.Vertical
+            for(N:=0..Recipe.Ingredients.Length-1):
+                if(CurrentIngredient:=Recipe.Ingredients[N]):
+                    IngredientBGTextureBlock := texture_block:
+                        DefaultImage:= Icons.IC_OrderIngredientBG  
+                        DefaultDesiredSize := vector2{X := 50.0, Y := 50.0}  
+                    IngredientTextureBlock := texture_block:
+                        DefaultImage:= CurrentIngredient.ItemIcon  
+                        DefaultDesiredSize := vector2{X := 100.0, Y := 90.0}
+                    IngredientCanvas:canvas=canvas:
+                        Slots:=array:
+                            canvas_slot:
+                                Widget:=IngredientTextureBlock
+                                Anchors:=anchors{Minimum:=vector2{X:=0.5,Y:=0.5},Maximum:=vector2{X:=0.5,Y:=0.5}}
+                                Offsets:=margin{Top:=0.0,Left:=0.0,Bottom:=0.0,Right:=0.0}
+                                SizeToContent:=true
+                                Alignment:=vector2{X:=0.5,Y:=0.5}
+                                ZOrder:=1
+                            canvas_slot:
+                                Widget:=IngredientBGTextureBlock
+                                Anchors:=anchors{Minimum:=vector2{X:=0.5,Y:=0.5},Maximum:=vector2{X:=0.5,Y:=0.5}}
+                                Offsets:=margin{Top:=0.0,Left:=0.0,Bottom:=0.0,Right:=0.0}
+                                SizeToContent:=true
+                                Alignment:=vector2{X:=0.5,Y:=0.5}
+                                ZOrder:=0
+                    IngredientSlot:=stack_box_slot:
+                        Widget:=IngredientCanvas
+                        HorizontalAlignment:=horizontal_alignment.Center
+                        VerticalAlignment:=vertical_alignment.Center
+                    IngredientStack.AddWidget(IngredientSlot)
+            RecipeCanvas:=Recipe.MakeRecipeCanvas(IngredientStack)
+            if(set RecipeCanvasToUniqueIDMap[RecipeCanvas]=RecipeUniqueID):
+            OrderStackSlot:=stack_box_slot:
+                Widget:=RecipeCanvas
+                HorizontalAlignment:=horizontal_alignment.Left
+                VerticalAlignment:=vertical_alignment.Bottom
+            OrderStack.AddWidget(OrderStackSlot)
+        spawn{RecipeTimedOut(Recipe)}
+        spawn{Recipe.KillRecipe()}
+        set RecipeUniqueID+=1
+        return Recipe
+
+    RecipeTimedOut<private>(Recipe:recipe)<suspends>:void=
+        Recipe.TimeOutEvent.Await()
+        Print("Time's up")
+        DisposeRecipe(Recipe)
+        spawn{RecipeTimedOut(Recipe)}
+
+    DisposeRecipe(ExpiredRecipe:recipe):void=
+        UniqueID:=ExpiredRecipe.RecipeUniqueID
+        for(Recipe->ID:RecipeCanvasToUniqueIDMap,ID=ExpiredRecipe.RecipeUniqueID):
+            for(Player->OrderStack:PlayerToOrderStackMap):
+                OrderStack.RemoveWidget(Recipe)
+        for(M:=0..ArrayOfRecipes.Length-1,ExistingRecipe:=ArrayOfRecipes[M]):
+            if(ExpiredRecipe=ExistingRecipe):
+                if(NewArrayOfRecipes:=ArrayOfRecipes.RemoveElement[M],set ArrayOfRecipes=NewArrayOfRecipes){}
 ####################
 ### Order UI End ###
 ####################
