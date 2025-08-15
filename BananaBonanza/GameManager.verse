@@ -12,117 +12,163 @@ using { /Verse.org/Colors/NamedColors }
 using { /Verse.org/Random }
 using { /Verse.org/Simulation }
 using { /Verse.org/Simulation/Tags }
+    
+DEBUGMODE : logic = false
+
+CustomUIWidgets := module :
+    WidgetMaterials<public> := module: 
 
 var SavedPlayerData:weak_map(player, saved_data) = map{}
 
 Game_Manager := class(creative_device):
+    @editable DebugControllerDevice : DebugController = DebugController{}
+    @editable ChallengeManagerDevice : Challenge_Manager = Challenge_Manager{}
 
     ## Variables ## 
-    var CustomUI:custom_ui_creator=custom_ui_creator{PlayerToCustomPlayerMap:=map{},RealTimeProp:=false}
+    var CustomUI:custom_ui_creator=custom_ui_creator{PlayerToCustomPlayerMap:=map{},RealTimeProp:=false, CurrencyManager := Currency_Manager{}}
     var CustomPlayers:[player]custom_player=map{}
     var LevelsToArrayCustomPlayersMap:[custom_level][]custom_player=map{}
     var GameRunning:logic=false
-    var StartingItems:[]item=array{}
-    var AllItems:[]item=array{}
-    var StartingAbilities:[]item=array{}
 
-    ## Type Casting ##
-    IntToMessage<localizes>(I:int):message="{I}"
-    StringToMessage<localizes>(S:string):message="{S}"
+    var AllWeapons:[]item=array{}
+    var AllSpecials:[]item=array{}
+    var AllHeals:[]item=array{}
+    var AllThrowables:[]item=array{}
+    var AllAbilities:[]item=array{}
+    var AllItems:[]item=array{}
 
     ## Editables ## 
-    @editable RealTimeProp:creative_prop=creative_prop{}
-    @editable IntroCinematic:cinematic_sequence_device=cinematic_sequence_device{}
+    @editable BrainRotSFX : []audio_player_device = array{}
+    @editable NoLaPolizia : audio_player_device = audio_player_device{}
+    @editable RealTimeProp : creative_prop = creative_prop{}
+
+    @editable ShowCinematicTrigger: trigger_device=trigger_device{}
+    @editable IntroCinematic : cinematic_sequence_device=cinematic_sequence_device{}
+    @editable IntroCinematicPersonal : cinematic_sequence_device=cinematic_sequence_device{}
+
     @editable BasementPulse:objective_device=objective_device{}
-    @editable ShopPulse:objective_device=objective_device{}
-    @editable ClearInventory:item_remover_device=item_remover_device{}
+
     @editable ItemShopButton:button_device=button_device{}
-    @editable BackInput:input_trigger_device=input_trigger_device{}
+    @editable ShopPulse:objective_device=objective_device{}
+    @editable HealShopButton:button_device=button_device{}
+    @editable HealShopPulse:objective_device=objective_device{}
+
+    @editable DamageMultiplier:damage_amplifier_powerup_device=damage_amplifier_powerup_device{}
+    @editable GoldDiggerGranter:item_granter_device=item_granter_device{}
+
+    <# @editable CloseUIInput : input_trigger_device = input_trigger_device{}
+    @editable CloseUIHUD : hud_message_device = hud_message_device{} #>
+
+    @editable PlaytimeTimerUI : timer_device = timer_device{}
+    @editable HighestLevelClearedUI : stat_creator_device = stat_creator_device{}
+
+    #@editable PlaytimeTrackerChallenge_StatCreator : stat_creator_device = stat_creator_device{}
+    @editable PlaytimeTimer : timer_device = timer_device{}
+    @editable CurrentLevelsCleared_StatCreator:stat_creator_device=stat_creator_device{}
+
+    @editable EvilLaughSFX : audio_player_device = audio_player_device{}
+    @editable EvilGuyWidget : hud_message_device = hud_message_device{}
+    @editable EvilGuyDisppearVFX : creative_prop_asset=DefaultCreativePropAsset
+    #@editable BossesEliminatedChallenge_StatCreator:stat_creator_device=stat_creator_device{}
+
+    #@editable TotalLevelsCleared_StatCreator:stat_creator_device=stat_creator_device{}
+
+    @editable ClearInventory:item_remover_device=item_remover_device{}
+    @editable DBNOInput : input_trigger_device = input_trigger_device{}
+    @editable DBNOHUD : hud_message_device = hud_message_device{}
+
+    @editable RoundSettings:round_settings_device=round_settings_device{}
+
     @editable EndGameMessage:hud_message_device=hud_message_device{}
-    @editable EndGameDialog:popup_dialog_device=popup_dialog_device{}
+    @editable EndGameButton:popup_dialog_device=popup_dialog_device{}
 
     ## Currency functionality ##
-    @editable CurrencyCheck:conditional_button_device=conditional_button_device{}
-    @editable CurrencyGranter:item_granter_device=item_granter_device{}
-    @editable CurrencyRemover:item_remover_device=item_remover_device{}
+    @editable{Categories := array{Currency}} CurrencyManager:Currency_Manager=Currency_Manager{}
 
-    ## Rarities ##
-    Common:rarity=rarity{Order:=1, BGIcon:= Icons.IC_V1_BG}
-    Uncommon:rarity=rarity{Order:=2, BGIcon:= Icons.IC_V2_BG}
-    Rare:rarity=rarity{Order:=3, BGIcon:= Icons.IC_V3_BG}
-    Epic:rarity=rarity{Order:=4, BGIcon:= Icons.IC_V4_BG}
-    Legendary:rarity=rarity{Order:=5, BGIcon:= Icons.IC_V5_BG}
-    Exotic:rarity=rarity{Order:=6, BGIcon:= Icons.IC_V6_BG}
-    Mythic:rarity=rarity{Order:=7, BGIcon:= Icons.IC_V7_BG}
+
+    Common:common=common{}
+    Uncommon:uncommon=uncommon{}
+    Rare:rare=rare{}
+    Epic:epic=epic{}
+    Legendary:legendary=legendary{}
+    Exotic:exotic=exotic{}
+    Mythic:mythic=mythic{}
 
 
     ### Item Granters ###
     #Pistol
-    #Tactical Pistol
-    @editable Pistol_Tactical_Common:item_granter_device=item_granter_device{}
-    @editable Pistol_Tactical_Uncommon:item_granter_device=item_granter_device{}
-    @editable Pistol_Tactical_Rare:item_granter_device=item_granter_device{}
-    @editable Pistol_Tactical_Epic:item_granter_device=item_granter_device{}
-    @editable Pistol_Tactical_Legendary:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Pistol}} Pistol_Tactical_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Pistol}} Pistol_Suppresed_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Pistol}} Pistol_Dual_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Pistol}} Pistol_HandCanon_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Pistol}} Pistol_KillSwitchRevolvers_Granter:item_granter_device=item_granter_device{}
     #SMG
-    #Combat SMG
-    @editable SMG_Recoil_Common:item_granter_device=item_granter_device{}
-    @editable SMG_Recoil_Uncommon:item_granter_device=item_granter_device{}
-    @editable SMG_Recoil_Rare:item_granter_device=item_granter_device{}
-    @editable SMG_Recoil_Epic:item_granter_device=item_granter_device{}
-    @editable SMG_Recoil_Legendary:item_granter_device=item_granter_device{}
+    @editable{Categories := array{SMG}} SMG_Recoil_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{SMG}} SMG_FirePetal_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{SMG}} SMG_Charge_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{SMG}} SMG_DualMicro_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{SMG}} SMG_SurgeFire_Granter:item_granter_device=item_granter_device{}
     #Shotgun
-    #Auto Shotgun
-    @editable Shotgun_CoreDPS_Common:item_granter_device=item_granter_device{}
-    @editable Shotgun_CoreDPS_Uncommon:item_granter_device=item_granter_device{}
-    @editable Shotgun_CoreDPS_Rare:item_granter_device=item_granter_device{}
-    @editable Shotgun_CoreDPS_Epic:item_granter_device=item_granter_device{}
-    @editable Shotgun_CoreDPS_Legendary:item_granter_device=item_granter_device{}
-    #Assault Rifle
-    #Assault Auto
-    @editable Assault_Auto_Common:item_granter_device=item_granter_device{}
-    @editable Assault_Auto_Uncommon:item_granter_device=item_granter_device{}
-    @editable Assault_Auto_Rare:item_granter_device=item_granter_device{}
-    @editable Assault_Auto_Epic:item_granter_device=item_granter_device{}
-    @editable Assault_Auto_Legendary:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Shotgun}} Shotgun_CoreDPS_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Shotgun}} Shotgun_Combat_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Shotgun}} Shotgun_Standard_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Shotgun}} Shotgun_PumpNDump_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Shotgun}} Shotgun_Drum_Granter:item_granter_device=item_granter_device{}
+    #Assault
+    @editable{Categories := array{Assault}} Assault_Auto_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Assault}} Assault_SemiAuto_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Assault}} Assault_PistolCaliber_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Assault}} Assault_Fury_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Assault}} Assault_MK_Granter:item_granter_device=item_granter_device{}
     #Sniper
-    #Hunter Bolt Action Sniper
-    @editable Hunter_Bolt_Action_Sniper_Common:item_granter_device=item_granter_device{}
-    @editable Hunter_Bolt_Action_Sniper_Uncommon:item_granter_device=item_granter_device{}
-    @editable Hunter_Bolt_Action_Sniper_Rare:item_granter_device=item_granter_device{}
-    @editable Hunter_Bolt_Action_Sniper_Epic:item_granter_device=item_granter_device{}
-    @editable Hunter_Bolt_Action_Sniper_Legendary:item_granter_device=item_granter_device{}
-    #RPG
-    #Rocket Launcher
-    @editable Rocket_Launcher_Common:item_granter_device=item_granter_device{}
-    @editable Rocket_Launcher_Uncommon:item_granter_device=item_granter_device{}
-    @editable Rocket_Launcher_Rare:item_granter_device=item_granter_device{}
-    @editable Rocket_Launcher_Epic:item_granter_device=item_granter_device{}
-    @editable Rocket_Launcher_Legendary:item_granter_device=item_granter_device{}
-    #Exotic
-    #Heisted Accelerant Shotgun
-    @editable Heisted_Accelerant_Shotgun_Exotic:item_granter_device=item_granter_device{}
-    #Shadow Tracker
-    @editable Shadow_Tracker_Exotic:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Sniper}} Hunter_BoltAction_Sniper_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Sniper}} FalconEye_Sniper_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Sniper}} RailGun_Sniper_Granter:item_granter_device=item_granter_device{}
+    #Misc
+    @editable{Categories := array{Misc}} Rocket_Launcher_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Misc}} Launcher_Grenade_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Misc}} ExCalliber_Rifle_Granter:item_granter_device=item_granter_device{}
+    #Special
+    @editable{Categories := array{Special}} Heisted_Accelerant_Shotgun:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Special}} Shadow_Tracker:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Special}} Dragons_Breath_Sniper:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Special}} HopRock_Dualies:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Special}} Chiller_Launcher:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Special}} ThunderBolt_Of_Zeus_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Special}} Typhoon_Blade_Granter:item_granter_device=item_granter_device{}
+    #Healing
+    @editable{Categories := array{Heals}} Apple_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Heals}} Banana_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Heals}} Bandage_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Heals}} Medkit_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Heals}} Medmist_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Heals}} Flopper_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Heals}} ChugSplash_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Heals}} BananaOfTheGods_Granter:item_granter_device=item_granter_device{}
+    #Throwables
+    @editable{Categories := array{Throwables}} Grenade_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Throwables}} PortAShack_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Throwables}} DanceGrenade_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Throwables}} FireflyJar_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Throwables}} ImpulseGrenade_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Throwables}} ProximityMine_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Throwables}} ShieldBubble_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Throwables}} Present_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Throwables}} BottleRockets_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Throwables}} BusinessTurret_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Throwables}} ClusterClinger_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Throwables}} CowCatcher_Granter:item_granter_device=item_granter_device{}
+    @editable{Categories := array{Throwables}} Dynamite_Granter:item_granter_device=item_granter_device{}
 
-    <#Misc
-    @editable Misc_Common:item_granter_device=item_granter_device{}
-    @editable Misc_Uncommon:item_granter_device=item_granter_device{}
-    @editable Misc_Rare:item_granter_device=item_granter_device{}
-    @editable Misc_Epic:item_granter_device=item_granter_device{}
-    @editable Misc_Legendary:item_granter_device=item_granter_device{} #>
-
-    ## Methods ## 
     OnBegin<override>()<suspends>:void=
         Print("Game Started")
+        PlayIntro()
+        DebugControllerDevice.SetDebugMode(DEBUGMODE)
+        RoundSettings.DisableMatchmaking()
         GetPlayspace().PlayerRemovedEvent().Subscribe(OnPlayerLeftServer)
-        InitItems()
-        InitSpawners()
-        InitLevels()
-        Sleep(5.0)
-        InitCustomUI()
-        set GameRunning = true
-        EndGameDialog.RespondingButtonEvent.Subscribe(EndGameFunctionality)
+        spawn{Initialization()}
+        IntroCinematic.StoppedEvent.Subscribe(GameStart)
+        EndGameButton.RespondingButtonEvent.Subscribe(EndGameFunctionality)
 
     OnPlayerLeftServer(PlayerLeaving:player):void=
         if(CustomPlayer:=CustomPlayers[PlayerLeaving]):
@@ -135,87 +181,165 @@ Game_Manager := class(creative_device):
 
     ############################################################################################################
     #Init Items ################################################################################################
-    InitItems():void=
-        set StartingItems = array{PistolTacticalCommon(), ShotgunCoreDPSCommon(), SMGRecoilCommon()}
-        set AllItems = array{
-            PistolTacticalCommon()
-            PistolTacticalUncommon()
-            PistolTacticalRare()
-            PistolTacticalEpic()
-            PistolTacticalLegendary()
-            ShotgunCoreDPSCommon()
-            ShotgunCoreDPSUncommon()
-            ShotgunCoreDPSRare()
-            ShotgunCoreDPSEpic()
-            ShotgunCoreDPSLegendary()
-            SMGRecoilCommon()
-            SMGRecoilUncommon()
-            SMGRecoilRare()
-            SMGRecoilEpic()
-            SMGRecoilLegendary()
-            AssaultAutoCommon()
-            AssaultAutoUncommon()
-            AssaultAutoRare()
-            AssaultAutoEpic()
-            AssaultAutoLegendary()
-            HunterBoltActionCommon()
-            HunterBoltActionUncommon()
-            HunterBoltActionRare()
-            HunterBoltActionEpic()
-            HunterBoltActionLegendary()
-            RocketLauncherCommon()
-            RocketLauncherUncommon()
-            RocketLauncherRare()
-            RocketLauncherEpic()
-            RocketLauncherLegendary()
-        }
-        set CustomUI.LTOArray = array{
-            RocketLauncherEpic()
-            RocketLauncherLegendary()
-            HeistedAccelerantShotgunExotic()
-            ShadowTrackerExotic()
-        }
+    Initialization()<suspends> : void = 
+        InitItems()
+        InitSpawners()
+        Sleep(2.0)
+        InitLevels()
+        InitCustomUI()
+        CurrencyManager.InitCurrencyManager(CustomPlayers)
+        ChallengeManagerDevice.InitChallengeManager(CustomPlayers)
 
-    #PistolTactical
-    PistolTacticalCommon():pistol_tactical=pistol_tactical{Granter:=Pistol_Tactical_Common,Rarity:=Common,Price:=50}
-    PistolTacticalUncommon():pistol_tactical=pistol_tactical{Granter:=Pistol_Tactical_Uncommon,Rarity:=Uncommon,Price:=100}
-    PistolTacticalRare():pistol_tactical=pistol_tactical{Granter:=Pistol_Tactical_Rare,Rarity:=Rare,Price:=200}
-    PistolTacticalEpic():pistol_tactical=pistol_tactical{Granter:=Pistol_Tactical_Epic,Rarity:=Epic,Price:=400}
-    PistolTacticalLegendary():pistol_tactical=pistol_tactical{Granter:=Pistol_Tactical_Legendary,Rarity:=Legendary,Price:=600}
-    #ShotgunCoreDPS
-    ShotgunCoreDPSCommon():shotgun_coredps=shotgun_coredps{Granter:=Shotgun_CoreDPS_Common,Rarity:=Common,Price:=80}
-    ShotgunCoreDPSUncommon():shotgun_coredps=shotgun_coredps{Granter:=Shotgun_CoreDPS_Uncommon,Rarity:=Uncommon,Price:=160}
-    ShotgunCoreDPSRare():shotgun_coredps=shotgun_coredps{Granter:=Shotgun_CoreDPS_Rare,Rarity:=Rare,Price:=320}
-    ShotgunCoreDPSEpic():shotgun_coredps=shotgun_coredps{Granter:=Shotgun_CoreDPS_Epic,Rarity:=Epic,Price:=500}
-    ShotgunCoreDPSLegendary():shotgun_coredps=shotgun_coredps{Granter:=Shotgun_CoreDPS_Legendary,Rarity:=Legendary,Price:=700}
-    #SMGRecoil
-    SMGRecoilCommon():smg_recoil=smg_recoil{Granter:=SMG_Recoil_Common,Rarity:=Common,Price:=100}
-    SMGRecoilUncommon():smg_recoil=smg_recoil{Granter:=SMG_Recoil_Uncommon,Rarity:=Uncommon,Price:=200}
-    SMGRecoilRare():smg_recoil=smg_recoil{Granter:=SMG_Recoil_Rare,Rarity:=Rare,Price:=400}
-    SMGRecoilEpic():smg_recoil=smg_recoil{Granter:=SMG_Recoil_Epic,Rarity:=Epic,Price:=600}
-    SMGRecoilLegendary():smg_recoil=smg_recoil{Granter:=SMG_Recoil_Legendary,Rarity:=Legendary,Price:=800}
-    #AssaultAuto
-    AssaultAutoCommon():assault_auto=assault_auto{Granter:=Assault_Auto_Common,Rarity:=Common,Price:=200}
-    AssaultAutoUncommon():assault_auto=assault_auto{Granter:=Assault_Auto_Uncommon,Rarity:=Uncommon,Price:=400}
-    AssaultAutoRare():assault_auto=assault_auto{Granter:=Assault_Auto_Rare,Rarity:=Rare,Price:=600}
-    AssaultAutoEpic():assault_auto=assault_auto{Granter:=Assault_Auto_Epic,Rarity:=Epic,Price:=800}
-    AssaultAutoLegendary():assault_auto=assault_auto{Granter:=Assault_Auto_Legendary,Rarity:=Legendary,Price:=1000}
-    #HunterBoltActionSniper
-    HunterBoltActionCommon():sniper_coresniper=sniper_coresniper{Granter:=Hunter_Bolt_Action_Sniper_Common,Rarity:=Common,Price:=400}
-    HunterBoltActionUncommon():sniper_coresniper=sniper_coresniper{Granter:=Hunter_Bolt_Action_Sniper_Uncommon,Rarity:=Uncommon,Price:=800}
-    HunterBoltActionRare():sniper_coresniper=sniper_coresniper{Granter:=Hunter_Bolt_Action_Sniper_Rare,Rarity:=Rare,Price:=1000}
-    HunterBoltActionEpic():sniper_coresniper=sniper_coresniper{Granter:=Hunter_Bolt_Action_Sniper_Epic,Rarity:=Epic,Price:=1300}
-    HunterBoltActionLegendary():sniper_coresniper=sniper_coresniper{Granter:=Hunter_Bolt_Action_Sniper_Legendary,Rarity:=Legendary,Price:=1600}
-    #RocketLauncher
-    RocketLauncherCommon():launcher_rocket=launcher_rocket{Granter:=Rocket_Launcher_Common,Rarity:=Common,Price:=1200}
-    RocketLauncherUncommon():launcher_rocket=launcher_rocket{Granter:=Rocket_Launcher_Uncommon,Rarity:=Uncommon,Price:=2400}
-    RocketLauncherRare():launcher_rocket=launcher_rocket{Granter:=Rocket_Launcher_Rare,Rarity:=Rare,Price:=3600}
-    RocketLauncherEpic():launcher_rocket=launcher_rocket{Granter:=Rocket_Launcher_Epic,Rarity:=Epic,Price:=4800}
-    RocketLauncherLegendary():launcher_rocket=launcher_rocket{Granter:=Rocket_Launcher_Legendary,Rarity:=Legendary,Price:=6000}
-    #HeistedAccelerantShotgun
-    HeistedAccelerantShotgunExotic():heisted_accelerant_shotgun=heisted_accelerant_shotgun{Granter:=Heisted_Accelerant_Shotgun_Exotic,Rarity:=Exotic,Price:=5000}
-    #WaffleTruck Pistol
-    ShadowTrackerExotic():shadow_tracker=shadow_tracker{Granter:=Shadow_Tracker_Exotic,Rarity:=Exotic,Price:=5000}
+    InitItems():void=
+        set AllWeapons = array : 
+            PistolTactical()
+            PistolSuppresed()
+            PistolHandCanon()
+            PistolDual()
+            PistolKillSwitchRevolver()
+            SMGRecoil()
+            SMGFirePetal()
+            SMGCharge()
+            SMGDualMicro()
+            SMGSurgefire()
+            ShotgunCoreDPS()
+            ShotgunCombat()
+            ShotgunStandard()
+            ShotgunDrum()
+            ShotgunPumpNDump()
+            AssaultAuto()
+            AssaultSemiAuto()
+            AssaultPistolCaliber()
+            AssaultFury()
+            AssaultMK()
+            HunterBoltAction()
+            SniperRailGun()
+            SniperFalconEye()
+            RocketLauncher()
+            LauncherGrenade()
+            ExCalliberRifle()
+            
+        set AllSpecials = array :
+            HeistedAccelerantShotgun()
+            ShadowTracker()
+            DragonsBreathSniper()
+            HopRockDualies()
+            #ChillerLauncher()
+            ZeusThunderbolt()
+            TyphoonBlade()
+
+        set AllHeals = array :
+            AppleCommon()
+            BananaCommon()
+            BandageCommon()
+            MedkitUncommon()
+            MedmistUncommon()
+            FlopperUncommon()
+            ChugSplashRare()
+            BananaOfTheGodsLegendary()
+
+        set AllThrowables = array:
+            GrenadeCommon()
+            CowCatcherCommon()
+            PortAShackUncommon()
+            ShieldBubbleUncommon()
+            BottleRocketsUncommon()
+            DynamiteUncommon()
+            ClusterClingerUncommon()
+            DanceGrenadeRare()
+            FireflyJarRare()
+            ImpulseGrenadeRare()
+            ProximityMineRare()
+            BusinessTurretEpic()
+            PresentLegendary()
+
+        set AllAbilities = array:
+            GrantGoldUncommon()
+            GrantGoldRare()
+            GrantHealthUncommon()
+            GrantHealthRare()
+            IncreaseMaxHealth()
+            HealthRegen()
+            LifeSteal()
+            #GoldDigger()
+            #DamageInc()
+            #Respawn()
+
+        set AllItems += AllWeapons + AllSpecials + AllHeals + AllThrowables + AllAbilities
+        set CustomUI.LTOArray =  AllSpecials <# + array{RocketLauncherEpic(), RocketLauncherLegendary()} #>
+
+    PistolTactical():pistol=pistol{Name<override>:="COMBAT PISTOL",Icon<override>:=Icons.IC_PistolTactical,BasePrice<override>:=50,Granter:=Pistol_Tactical_Granter}
+    PistolSuppresed():pistol=pistol{Name<override>:="SUPPRESED PISTOL",Icon<override>:=Icons.IC_Suppresed_Pistol,BasePrice<override>:=75,Granter:=Pistol_Suppresed_Granter}
+    PistolHandCanon():pistol=pistol{Name<override>:="HAND CANON",Icon<override>:=Icons.IC_Hand_Canon,BasePrice<override>:=125,Granter:=Pistol_HandCanon_Granter,MinRarity:=Rare}
+    PistolKillSwitchRevolver():pistol=pistol{Name<override>:="KILLSWITCH REVOLVERS",Icon<override>:=Icons.IC_Killswitch_Revolvers,BasePrice<override>:=250,Granter:=Pistol_KillSwitchRevolvers_Granter,MinRarity:=Rare}
+    PistolDual():pistol=pistol{Name<override>:="DUAL PISTOLS",Icon<override>:=Icons.IC_Dual_Pistol,BasePrice<override>:=100,Granter:=Pistol_Dual_Granter,MinRarity:=Uncommon}
+    SMGRecoil():smg=smg{Name<override>:="COMBAT SMG",Icon<override>:=Icons.IC_SMGRecoil,BasePrice<override>:=100,Granter:=SMG_Recoil_Granter}
+    SMGFirePetal():smg=smg{Name<override>:="PRECISION SMG",Icon<override>:=Icons.IC_Veiled_Presicion_SMG,BasePrice<override>:=100,Granter:=SMG_FirePetal_Granter}
+    SMGCharge():smg=smg{Name<override>:="CHARGE SMG",Icon<override>:=Icons.IC_Charge_SMG,BasePrice<override>:=115,Granter:=SMG_Charge_Granter}
+    SMGDualMicro():smg=smg{Name<override>:="DUAL MICRO SMG",Icon<override>:=Icons.IC_Dual_Micro_SMG,BasePrice<override>:=125,Granter:=SMG_DualMicro_Granter}
+    SMGSurgefire():smg=smg{Name<override>:="SURGE FIRE SMG",Icon<override>:=Icons.IC_Surgefire_SMG,BasePrice<override>:=125,Granter:=SMG_SurgeFire_Granter}
+    ShotgunCoreDPS():shotgun=shotgun{Name<override>:="AUTO SHOTGUN",Icon<override>:=Icons.IC_ShotgunCoreDPS,BasePrice<override>:=80,Granter:=Shotgun_CoreDPS_Granter}
+    ShotgunCombat():shotgun=shotgun{Name<override>:="COMBAT SHOTGUN",Icon<override>:=Icons.IC_Combat_Shotgun,BasePrice<override>:=80,Granter:=Shotgun_Combat_Granter}
+    ShotgunStandard():shotgun=shotgun{Name<override>:="PUMP SHOTGUN",Icon<override>:=Icons.IC_Pump_Shotgun,BasePrice<override>:=90,Granter:=Shotgun_Standard_Granter}
+    ShotgunDrum():shotgun=shotgun{Name<override>:="DRUM SHOTGUN",Icon<override>:=Icons.IC_DrumShotgun,BasePrice<override>:=90,Granter:=Shotgun_Drum_Granter}
+    ShotgunPumpNDump():shotgun=shotgun{Name<override>:="PUMP AND DUMP SHOTGUN",Icon<override>:=Icons.IC_Pump_Dump,BasePrice<override>:=140,Granter:=Shotgun_PumpNDump_Granter}
+    AssaultAuto():assault=assault{Name<override>:="ASSAULT RIFLE",Icon<override>:=Icons.IC_AssaultAuto,BasePrice<override>:=200,Granter:=Assault_Auto_Granter}
+    AssaultSemiAuto():assault=assault{Name<override>:="BURST ASSAULT RIFLE",Icon<override>:=Icons.IC_Burst_Assault_Rifle,BasePrice<override>:=200,Granter:=Assault_SemiAuto_Granter}
+    AssaultPistolCaliber():assault=assault{Name<override>:="TACTICAL ASSAULT RIFLE",Icon<override>:=Icons.IC_Tactical_Assault_Rifle,BasePrice<override>:=220,Granter:=Assault_PistolCaliber_Granter}
+    AssaultFury():assault=assault{Name<override>:="FURY ASSAULT RIFLE",Icon<override>:=Icons.IC_FuryAssaultRifle,BasePrice<override>:=200,Granter:=Assault_Fury_Granter}
+    AssaultMK():assault=assault{Name<override>:="MK ASSAULT RIFLE",Icon<override>:=Icons.IC_MK_Assault_Rifle,BasePrice<override>:=225,Granter:=Assault_MK_Granter}
+    HunterBoltAction():sniper=sniper{Name<override>:="HUNTER BOLT ACTION",Icon<override>:=Icons.IC_SniperCoreSniper,BasePrice<override>:=400,Granter:=Hunter_BoltAction_Sniper_Granter}
+    SniperRailGun():sniper=sniper{Name<override>:="RAIL GUN",Icon<override>:=Icons.IC_Rail_Gun,BasePrice<override>:=600,Granter:=RailGun_Sniper_Granter,MinRarity:=Rare}
+    SniperFalconEye():sniper=sniper{Name<override>:="FALCON EYE SNIPER",Icon<override>:=Icons.IC_Falcon_Eye_Sniper,BasePrice<override>:=450,Granter:=FalconEye_Sniper_Granter}
+    RocketLauncher():explosive=explosive{Name<override>:="ROCKET LAUNCHER",Icon<override>:=Icons.IC_LauncherRocket,BasePrice<override>:=1600,Granter:=Rocket_Launcher_Granter}
+    LauncherGrenade():explosive=explosive{Name<override>:="GRENADE LAUNCHER",Icon<override>:=Icons.IC_Grenade_Launcher,BasePrice<override>:=1000,Granter:=Launcher_Grenade_Granter,MinRarity:=Rare}
+    ExCalliberRifle():explosive=explosive{Name<override>:="EXCALLIBER RIFLE",Icon<override>:=Icons.IC_ExCalliber_Rifle,BasePrice<override>:=750,Granter:=ExCalliber_Rifle_Granter,MinRarity:=Rare}
+
+    #Specials
+    HeistedAccelerantShotgun():special=special{Name:="HEISTED ACCELERANT SHOTGUN",Icon:=Icons.IC_HeistedAccelerantShotgun,BasePrice:=5000,Granter:=Heisted_Accelerant_Shotgun, MinRarity:=Exotic, MaxRarity:=Exotic}
+    ShadowTracker():special=special{Name:="SHADOW TRACKER",Icon:=Icons.IC_ShadowTracker,BasePrice:=5000,Granter:=Shadow_Tracker, MinRarity:=Exotic, MaxRarity:=Exotic}
+    DragonsBreathSniper():special=special{Name:="DRAGONS BREATH SNIPER",Icon:=Icons.IC_DragonsBreathSniper,BasePrice:=5000,Granter:=Dragons_Breath_Sniper, MinRarity:=Exotic, MaxRarity:=Exotic}
+    HopRockDualies():special=special{Name:="HOP ROCK DUALIES",Icon:=Icons.IC_HopRockDualies,BasePrice:=5000,Granter:=HopRock_Dualies, MinRarity:=Exotic, MaxRarity:=Exotic}
+    ChillerLauncher():special=special{Name:="CHILLER LAUNCHER",Icon:=Icons.IC_ChillerLauncher,BasePrice:=5000,Granter:=Chiller_Launcher, MinRarity:=Exotic, MaxRarity:=Exotic}
+    ZeusThunderbolt():special=special{Name:="ZEUS THUNDER",Icon:=Icons.IC_Thunderbold_of_Zeus,BasePrice:=5000,Granter:=ThunderBolt_Of_Zeus_Granter, MinRarity:=Exotic, MaxRarity:=Exotic}
+    TyphoonBlade():special=special{Name:="TYPHOON BLADE",Icon:=Icons.IC_Typhoon_Blade,BasePrice:=5000,Granter:=Typhoon_Blade_Granter, MinRarity:=Mythic, MaxRarity:=Mythic}
+
+    #Healings
+    AppleCommon():heal=heal{Name:="APPLE",Icon:=Icons.IC_Apple,BasePrice:=100,Granter:=Apple_Granter, MinRarity:=Common, MaxRarity:=Common}
+    BananaCommon():heal=heal{Name:="BANANA",Icon:=Icons.IC_BananaOfTheGods,BasePrice:=100,Granter:=Banana_Granter, MinRarity:=Common, MaxRarity:=Common}
+    BandageCommon():heal=heal{Name:="BANDAGE",Icon:=Icons.IC_Bandages,BasePrice:=100,Granter:=Bandage_Granter, MinRarity:=Common, MaxRarity:=Common}
+    MedkitUncommon():heal=heal{Name:="MEDKIT",Icon:=Icons.IC_Medkit,BasePrice:=1000,Granter:=Medkit_Granter, MinRarity:=Uncommon, MaxRarity:=Uncommon}
+    MedmistUncommon():heal=heal{Name:="MEDMIST",Icon:=Icons.IC_Medmist,BasePrice:=1000,Granter:=Medmist_Granter, MinRarity:=Uncommon, MaxRarity:=Uncommon}
+    FlopperUncommon():heal=heal{Name:="FLOPPER",Icon:=Icons.IC_Flopper,BasePrice:=1000,Granter:=Flopper_Granter, MinRarity:=Uncommon, MaxRarity:=Uncommon}
+    ChugSplashRare():heal=heal{Name:="CHUG SPLASH",Icon:=Icons.IC_ChugSplash,BasePrice:=1250,Granter:=ChugSplash_Granter, MinRarity:=Rare, MaxRarity:=Rare}
+    BananaOfTheGodsLegendary():heal=heal{Name:="BANANA OF THE GODS",Icon:=Icons.IC_BananaOfTheGods,BasePrice:=1750,Granter:=BananaOfTheGods_Granter, MinRarity:=Legendary, MaxRarity:=Legendary}
+
+    #Throwables
+    GrenadeCommon():throwable=throwable{Name:="GRENADE",Icon:=Icons.IC_Grenade,BasePrice:=100,Granter:=Grenade_Granter, MinRarity:=Common, MaxRarity:=Common}
+    PortAShackUncommon():throwable=throwable{Name:="PORT-A-BUNKER",Icon:=Icons.IC_PortAShack,BasePrice:=500,Granter:=PortAShack_Granter, MinRarity:=Uncommon, MaxRarity:=Uncommon}
+    DanceGrenadeRare():throwable=throwable{Name:="BOOGIE BOMB",Icon:=Icons.IC_DanceGrenade,BasePrice:=750,Granter:=DanceGrenade_Granter, MinRarity:=Rare, MaxRarity:=Rare}
+    FireflyJarRare():throwable=throwable{Name:="FIREFLY JAR",Icon:=Icons.IC_FireflyJar,BasePrice:=750,Granter:=FireflyJar_Granter, MinRarity:=Rare, MaxRarity:=Rare}
+    ImpulseGrenadeRare():throwable=throwable{Name:="IMPULSE GRENADE",Icon:=Icons.IC_ImpulseGrenade,BasePrice:=750,Granter:=ImpulseGrenade_Granter, MinRarity:=Rare, MaxRarity:=Rare}
+    ProximityMineRare():throwable=throwable{Name:="PROXIMITY MINE",Icon:=Icons.IC_ProximityMine,BasePrice:=750,Granter:=ProximityMine_Granter, MinRarity:=Rare, MaxRarity:=Rare}
+    ShieldBubbleUncommon():throwable=throwable{Name:="SHIELD BUBBLE",Icon:=Icons.IC_ShieldBubble,BasePrice:=750,Granter:=ShieldBubble_Granter, MinRarity:=Uncommon, MaxRarity:=Uncommon}
+    PresentLegendary():throwable=throwable{Name:="PRESENT",Icon:=Icons.IC_Present,BasePrice:=1750,Granter:=Present_Granter, MinRarity:=Legendary, MaxRarity:=Legendary}
+    CowCatcherCommon():throwable=throwable{Name:="COW CATCHER",Icon:=Icons.IC_CowCatcher,BasePrice:=100,Granter:=CowCatcher_Granter, MinRarity:=Common, MaxRarity:=Common}
+    BottleRocketsUncommon():throwable=throwable{Name:="FIREWORKS",Icon:=Icons.IC_BottleRockets,BasePrice:=500,Granter:=BottleRockets_Granter, MinRarity:=Uncommon, MaxRarity:=Uncommon}
+    DynamiteUncommon():throwable=throwable{Name:="DYNAMITE",Icon:=Icons.IC_Dynamite,BasePrice:=500,Granter:=Dynamite_Granter, MinRarity:=Uncommon, MaxRarity:=Uncommon}
+    ClusterClingerUncommon():throwable=throwable{Name:="CLUSTER CLINGER",Icon:=Icons.IC_ClusterClinger,BasePrice:=500,Granter:=ClusterClinger_Granter, MinRarity:=Uncommon, MaxRarity:=Uncommon}
+    BusinessTurretEpic():throwable=throwable{Name:="BUSINESS TURRET",Icon:=Icons.IC_BusinessTurret,BasePrice:=1250,Granter:=BusinessTurret_Granter, MinRarity:=Epic, MaxRarity:=Epic}
+
+    #Abiltiies
+    GrantGoldUncommon():ability=grant_gold {CurrencyManager:= CurrencyManager, CurrencyGrantType:=currency_grant_type.AbilityGoldUncommon, MinRarity:=Common, MaxRarity:=Common}
+    GrantGoldRare():ability=grant_gold {Name<override>:="125 GOLD", CurrencyManager:= CurrencyManager, CurrencyGrantType:=currency_grant_type.AbilityGoldRare, MinRarity:=Rare, MaxRarity:=Rare}
+    GrantHealthUncommon():ability=grant_health {MinRarity:=Uncommon, MaxRarity:=Uncommon}
+    GrantHealthRare():ability=grant_health {MinRarity:=Rare, MaxRarity:=Rare, Name<override>:="100 HP"}
+    IncreaseMaxHealth():ability=increase_max_health {MinRarity:=Uncommon, MaxRarity:=Uncommon}
+    HealthRegen():ability=health_regen {MinRarity:=Epic, MaxRarity:=Epic}
+    DamageInc():ability=damage_inc {MinRarity:=Uncommon, MaxRarity:=Uncommon, DamageMultiplier := DamageMultiplier}
+    LifeSteal():ability=life_steal {MinRarity:=Epic, MaxRarity:=Epic}
+    GoldDigger():ability=gold_digger {MinRarity:=Legendary, MaxRarity:=Legendary}
+    #Respawn():ability=respawn {MinRarity:=Legendary, MaxRarity:=Legendary}
 
     ######################################################################################################################
     # Init Spawners ######################################################################################################
@@ -226,124 +350,173 @@ Game_Manager := class(creative_device):
                 Spawner.SpawnedEvent.Subscribe(OnPlayerSpawned)
 
     OnPlayerSpawned(Agent:agent):void=
-        if(Player:=player[Agent]):
-            InitPlayer(Player)
-
-    InitPlayer(Player:player):void=
         if:
-            Agent:=agent[Player]
+            Player:=player[Agent]
+            not CustomPlayers[Player]
+        then:
+            PossibleCustomPlayer := InitPlayer(Player, Agent)
+            if(CustomPlayer := PossibleCustomPlayer?) then CheckPreviousPlaysForPulse(CustomPlayer)
+            if(GameRunning?):
+                set CustomUI.PlayerToCustomPlayerMap=CustomPlayers
+                CustomUI.ApplyGlobalExistingUIs(Player)
+        else if:
+            Player:=player[Agent]
+            CustomPlayer := CustomPlayers[Player]
+        then:
+            UpdateLevelClearedRunTime(CustomPlayer)
+            CheckPreviousPlaysForPulse(CustomPlayer)
+
+    CheckPreviousPlaysForPulse(CustomPlayer:custom_player):void=
+        if:
+            Player := CustomPlayer.Player
+            Agent := agent[Player]
+        then:
+            if:
+                CustomPlayer.NewPlayer?
+            then:
+                UpdatePlayerData(Player, "NewPlayer", 0.0)
+                Print("Player ain't old no more")
+                BasementPulse.ActivateObjectivePulse(Agent)
+            else:
+                Print("Player will stay old for ever")
+                #ShowCinematicTrigger.Trigger(Agent)
+                ShopPulse.ActivateObjectivePulse(Agent)
+        
+    InitPlayer(Player:player, Agent : agent) : ?custom_player=
+        if:
             FortChar:=Agent.GetFortCharacter[]
             Player.IsActive[]
         then:
+            CustomPlayer:=MakeCustomPlayer(Player, InitializePlayerInventory(AllWeapons),InitializePlayerInventory(AllHeals), InitializePlayerInventory(AllThrowables), InitializePlayerInventory(AllAbilities),  InitializePlayerInventory(AllSpecials), CurrentLevelsCleared_StatCreator, PlaytimeTimer, HighestLevelClearedUI, CurrencyManager)
             if:
                 not SavedPlayerData[Player]
-                set SavedPlayerData[Player] = saved_data{} 
-            if(not CustomPlayers[Player]):
-                CustomPlayer:=MakeCustomPlayer(Player, StartingItems, CurrencyCheck, CurrencyRemover)
-                OldSavedPlayerData:=GetPlayerData(Player)
-                CustomPlayer.Init(OldSavedPlayerData.NewPlayer, OldSavedPlayerData.TimesCompleted, OldUnlockedItems(OldSavedPlayerData.UnlockedItems))
-                if(set CustomPlayers[Player]=CustomPlayer){}
-            if(GameRunning?): 
-                set CustomUI.PlayerToCustomPlayerMap=CustomPlayers
-                CustomUI.ApplyGlobalExistingUIs(Player)
+                set SavedPlayerData[Player] = saved_data{}
+            OldSavedPlayerData:=GetPlayerData(Player)
+            CustomPlayer.Init(OldSavedPlayerData.NewPlayer, OldSavedPlayerData.TimesCompleted, OldSavedPlayerData.BestRunTime, OldSavedPlayerData.UnlockedItemsV2)
+            if(set CustomPlayers[Player]=CustomPlayer){}
+            #spawn{PlaytimeTracker(CustomPlayer)}
             FortChar.EliminatedEvent().Subscribe(OnEliminatedEvent)
-            PlayIntro(Agent)
+            <# if(GameRunning?):
+                IntroCinematicPersonal.SetPlaybackFrame(0)
+                IntroCinematicPersonal.Play(Agent)
+                ShowCinematicTrigger.Trigger(Agent) #>
+            return option{CustomPlayer}
+        return false
+
+    InitializePlayerInventory(Items:[]item): []item = 
+        var PlayerItems :[]item= array{}
+        for(Item: Items):
+            newItem := Item.Clone()
+            set PlayerItems += array{newItem}
+        return PlayerItems
 
     GetPlayerData(Player : player) : saved_data=
-        var NewSavedData : saved_data = saved_data{}
-        if:
-            PlayerTable := SavedPlayerData[Player]
-        then:
-            set NewSavedData = PlayerTable
-        return NewSavedData
+        if (PlayerTable:=SavedPlayerData[Player]) then return PlayerTable
+        return saved_data{}
 
-    UpdatePlayerData(Player : player, DataToUpdate : string, Value : int) : void=
+    UpdatePlayerData(Player : player, DataToUpdate : string, Value : float) : void=
         if:
             Player.IsActive[]
             PlayerTable := SavedPlayerData[Player]
             CustomPlayer:=CustomPlayers[Player]
+        then:
             case(DataToUpdate):
                 "NewPlayer"=> 
-                    if(Value = 0):
+                    if:
+                        Value = 0.0
                         set SavedPlayerData[Player] = saved_data:
                             MakeSavedData<constructor>(PlayerTable)
                             NewPlayer := false
                         set CustomPlayer.NewPlayer = false
-                    else:
+                    <# else if:
                         set SavedPlayerData[Player] = saved_data:
                             MakeSavedData<constructor>(PlayerTable)
                             NewPlayer := true
-                        set CustomPlayer.NewPlayer = true
-                        Print("Maybe both are running")
+                        set CustomPlayer.NewPlayer = true #>
                 "TimesCompleted"=>
                     CurrentTimesCompleted := PlayerTable.TimesCompleted  
-                    set SavedPlayerData[Player] = saved_data:
-                        MakeSavedData<constructor>(PlayerTable)
-                        TimesCompleted :=  CurrentTimesCompleted + 1
-                    set CustomPlayer.TimesCompleted = CurrentTimesCompleted + 1
+                    if:
+                        set SavedPlayerData[Player] = saved_data:
+                            MakeSavedData<constructor>(PlayerTable)
+                            TimesCompleted :=  CurrentTimesCompleted + 1
+                        set CustomPlayer.PlayerStats.TimesCompleted = CurrentTimesCompleted + 1
+                "BestRunTime"=>
+                    CustomPlayer.SetBestRunTimeValue(Value)
+                    if:
+                        set SavedPlayerData[Player] = saved_data:
+                            MakeSavedData<constructor>(PlayerTable)
+                            BestRunTime :=  CustomPlayer.PlayerStats.BestRunTime
                 _=>
         return
 
     UpdatePlayerUnlockedWeapons(Agent:agent) :void =
-        var PlayerUnlockedItemsNames:[]string=array{}
-        if(Player := player[Agent]):
-            if:
-                CustomPlayer:=CustomPlayers[Player]
-            then:
-                for(Item:CustomPlayer.UnlockedItems):
-                    ItemName:="{Item.Name} {Item.Rarity.Order}"
-                    set PlayerUnlockedItemsNames += array{ItemName}
+        var PlayerUnlockedItems:[string]int=map{}
+        if(Player := player[Agent], CustomPlayer:=CustomPlayers[Player]):
+            for(Item:CustomPlayer.UnlockedItemArray):
+                if(set PlayerUnlockedItems[Item.Name] = Item.Rarity.Order){}
+            PersistanceUpdatedMap := StartingItemsPersistenceCheck(CustomPlayer,PlayerUnlockedItems) #set a function that compares players inventory with new default items. 
             if:
                 Player.IsActive[]
                 PlayerTable := SavedPlayerData[Player]
                 set SavedPlayerData[Player] = saved_data:
                     MakeSavedData<constructor>(PlayerTable)
-                    UnlockedItems:= PlayerUnlockedItemsNames
+                    UnlockedItemsV2 := PersistanceUpdatedMap
 
-    OldUnlockedItems(OldUnlockedItemsNames:[]string):[]item=
-        var ItemArray:[]item=array{}
-        for(OldItemName:OldUnlockedItemsNames):
-            OldNameLength:=OldItemName.Length
-            var OldName:string=""
-            var OldOrder:string=""
-            if:
-                Name:=OldItemName.Slice[0, OldItemName.Length-2]
-                NumInStr:=OldItemName.Slice[OldItemName.Length-1]
-            then:
-                set OldName = Name
-                set OldOrder=NumInStr
-            for(Item:AllItems):
+    StartingItemsPersistenceCheck(CustomPlayer:custom_player, PlayerUnlockedItems : [string]int) : [string]int = 
+        allRarities :[]rarity= array{locked{}, common{}, uncommon{}, rare{}, epic{}, legendary{}, exotic{}, mythic{}}
+        NewSavedData := saved_data{}
+        var UpdatedArray : [string]int = PlayerUnlockedItems
+        Print("Starting Updated array length is: {UpdatedArray.Length}")
+        for(UnlockedItemName->UnlockedItemRarityOrder:PlayerUnlockedItems):
+            var Found : logic = false
+            for(NewItemName->NewItemRarityOrder:NewSavedData.UnlockedItemsV2,not Found?):
                 if:
-                    Item.Name = OldName
-                    ToString(Item.Rarity.Order) = OldOrder
+                    UnlockedItemName = NewItemName
+                    set UpdatedArray[UnlockedItemName] = NewItemRarityOrder
                 then:
-                    Print(Item.Name + " " + ToString(Item.Rarity.Order))
-                    set ItemArray += array{Item}
-        return ItemArray
+                    set Found = true
+            for(UnlockedItem:CustomPlayer.UnlockedItemArray,UnlockedItem.Name = UnlockedItemName):
+                if:
+                    UnlockedItemRarityOrder > UnlockedItem.Rarity.Order
+                    RarityToSet := allRarities[UnlockedItemRarityOrder]
+                then:
+                    set UnlockedItem.Rarity = RarityToSet
+        Print("Final Updated array length is: {UpdatedArray.Length}")
+        return UpdatedArray
 
-    PlayIntro(Agent:agent):void=
-        if:
-            Player:=player[Agent]
-            CustomPlayer:=CustomPlayers[Player]
-        then:
+    PlayIntro():void=
+        IntroCinematic.SetPlaybackFrame(0)
+        IntroCinematic.Play()
+
+    <# PlaytimeTracker(CustomPlayer : custom_player)<suspends> : void = 
+        loop:
+            Sleep(60.0)
             if:
-                CustomPlayer.NewPlayer?
-            then:
-                IntroCinematic.SetPlaybackFrame(0)
-                IntroCinematic.Play(Agent)
-                BasementPulse.ActivateObjectivePulse(Agent)
-                UpdatePlayerData(Player, "NewPlayer", 0)
-            else:
-                ShopPulse.ActivateObjectivePulse(Agent)
-                #Play some loading screen until everything is ready 
+                Player:=CustomPlayer.Player
+                Agent:=agent[Player]
+                CurrentValue := PlaytimeTrackerChallenge_StatCreator.GetValue[Agent]
+                PlaytimeTrackerChallenge_StatCreator.SetValue[Agent, CurrentValue + 1]
+            if(not CustomPlayer.PlayerAlive?) then break #>
 
     OnEliminatedEvent(ElimResult:elimination_result):void=
         DeadChar:=ElimResult.EliminatedCharacter
+        NoLaPolizia.Play()
         if(Agent:=DeadChar.GetAgent[],Player:=player[Agent],CustomPlayer:=CustomPlayers[Player]):
             ClearInventory.Remove(Agent)
             CustomUI.RemoveSomeHUDS(option{Agent},false)
-            set CustomPlayer.LevelReached = -1
+            CustomPlayer.Reset()
             UpdatePlayerUnlockedWeapons(Player)
+            DBNOInput.Unregister(Agent)
+            DBNOHUD.Hide(Agent)
+
+    UpdateLevelClearedRunTime(CustomPlayer : custom_player) : void = 
+        if:
+            Agent := agent[CustomPlayer.Player]
+        then:
+            UpdatePlayerData(CustomPlayer.Player,"BestRunTime",CustomPlayer.GetRunTimeValue())
+            CustomUI.RemoveSomeHUDS(option{Agent},option{array{6}})
+            #CustomUI.ShowBestTimeUI(false, 6, option{Agent})
+        return
 
     ############################################################################################################
     #Init Levels################################################################################################
@@ -358,6 +531,16 @@ Game_Manager := class(creative_device):
         Level8:custom_level=MakeLevel(level8{},8)
         Level9:custom_level=MakeLevel(level9{},9)
         Level10:custom_level=MakeLevel(level10{},10)
+        Level11:custom_level=MakeLevel(level11{},11)
+        Level12:custom_level=MakeLevel(level12{},12)
+        Level13:custom_level=MakeLevel(level13{},13)
+        Level14:custom_level=MakeLevel(level14{},14)
+        Level15:custom_level=MakeLevel(level15{},15)
+        Level16:custom_level=MakeLevel(level16{},16)
+        Level17:custom_level=MakeLevel(level17{},17)
+        Level18:custom_level=MakeLevel(level18{},18)
+        Level19:custom_level=MakeLevel(level19{},19)
+        Level20:custom_level=MakeLevel(level20{},20)
         set LevelsToArrayCustomPlayersMap = map{
             Level1=>array{}
             Level2=>array{}
@@ -369,25 +552,144 @@ Game_Manager := class(creative_device):
             Level8=>array{}
             Level9=>array{}
             Level10=>array{}
+            Level11=>array{}
+            Level12=>array{}
+            Level13=>array{}
+            Level14=>array{}
+            Level15=>array{}
+            Level16=>array{}
+            Level17=>array{}
+            Level18=>array{}
+            Level19=>array{}
+            Level20=>array{}
             }
         MutatorZones:=FindCreativeObjectsWithTag(mutatorzone{})
         for(Obj:MutatorZones, MutatorZone:=mutator_zone_device[Obj]):
             MutatorTags:=MutatorZone.GetTags()
             MutatorZone.AgentEntersEvent.Subscribe(MutatorEvent_Handler{Device:=Self, Enters:=true, MutatorTags:=MutatorTags}.HandlerFunction)
             MutatorZone.AgentExitsEvent.Subscribe(MutatorEvent_Handler{Device:=Self, Enters:=false, MutatorTags:=MutatorTags}.HandlerFunction)
-        CompletedLevelTriggers:=FindCreativeObjectsWithTag(trigger{})
-        for(Obj:CompletedLevelTriggers, CompletedLevelTrigger:=trigger_device[Obj]):
-            TriggerTags:=CompletedLevelTrigger.GetTags()
-            CompletedLevelTrigger.TriggeredEvent.Subscribe(TriggerEvent_Handler{Device:=Self, TriggerTags:=TriggerTags}.HandlerFunction)
-        CurrencyCheck.ActivatedEvent.Subscribe(UpdatePlayerUnlockedWeapons)
-        #Here add the parameters for gold granting
-        ItemShopButton.InteractedWithEvent.Subscribe(ShopUI)
+        ClearedLevelTriggers:=FindCreativeObjectsWithTag(trigger{})
+        for(Obj:ClearedLevelTriggers, ClearedLevelTrigger:=trigger_device[Obj]):
+            TriggerTags:=ClearedLevelTrigger.GetTags()
+            ClearedLevelTrigger.TriggeredEvent.Subscribe(TriggerEvent_Handler{Device:=Self, ChallengeManager:=ChallengeManagerDevice, TriggerTags:=TriggerTags}.HandlerFunction)
+        GuardSpawnerDevices:=FindCreativeObjectsWithTag(guardspawner{})
+        for(Obj:GuardSpawnerDevices, GuardSpawnerDevice:=guard_spawner_device[Obj]):
+            GuardSpawnerDevice.DamagedEvent.Subscribe(ApplyAbilities)
+        for(Level->Array:LevelsToArrayCustomPlayersMap):
+            PossiblePeely := GetCharacterDevice(Level)
+            if(Peely := PossiblePeely?) then Peely.Disable()
+        ItemShopButton.InteractedWithEvent.Subscribe(ItemShopUI)
+        HealShopButton.InteractedWithEvent.Subscribe(HealShopUI)
+
+    IsInClearedLevel(CustomPlayer:custom_player,Level:custom_level):void=
+        LevelsCleared := CustomPlayer.PlayerStats.CurrentLevelsCleared
+        if:
+            Agent := agent[CustomPlayer.Player]
+            LevelsCleared < Level.Index
+        then:
+            CustomPlayer.SetCurrentLevelsClearedValue(Level.Index)
+            UpdateLevelClearedRunTime(CustomPlayer)
+            CurrencyManager.CurrencyGrant(Agent, currency_grant_type.LevelCleared)
+            PossibleObjective := GetObjectiveDevice(Level)
+            if(Objective := PossibleObjective?) then Objective.ActivateObjectivePulse(Agent)
+
+    GetCharacterDevice(Level : custom_level) : ?character_device = 
+        var CharactersArray : []character_device = array{}
+        CompletedLevelCharacters:=FindCreativeObjectsWithTag(Level.Tag)
+        for(CharacterDevice : CompletedLevelCharacters, Character := character_device[CharacterDevice]):
+            CurTags := CharacterDevice.GetTags()
+            if(not CurTags.Has[secondary{}]):
+                set CharactersArray += array{Character}
+        if(TrueCharacter := CharactersArray[0]) then return option{TrueCharacter}
+        return false
+
+    GetObjectiveDevice(Level : custom_level) : ?objective_device = 
+        var ObjectivesArray : []objective_device = array{}
+        CompletedLevelObjectives:=FindCreativeObjectsWithTag(Level.Tag)
+        for(ObjectiveDevice : CompletedLevelObjectives, Objective := objective_device[ObjectiveDevice]):
+            set ObjectivesArray += array{Objective}
+        if(TrueObjective := ObjectivesArray[0]) then return option{TrueObjective}
+        return false
+
+    GetTeleporterDevice(Level : custom_level) : ?teleporter_device = 
+        var TeleportersArray : []teleporter_device = array{}
+        CompletedLevelTeleporters:=FindCreativeObjectsWithTag(Level.Tag)
+        for(TeleporterDevice : CompletedLevelTeleporters, Teleporter := teleporter_device[TeleporterDevice]):
+            set TeleportersArray += array{Teleporter}
+            Print("Teleporter found")
+        if(TrueTeleporter := TeleportersArray[0]) then return option{TrueTeleporter}
+        return false
+
+    GetCinematicDevice(Level : custom_level) : ?cinematic_sequence_device = 
+        var CinematicsArray : []cinematic_sequence_device = array{}
+        CompletedLevelCinematics:=FindCreativeObjectsWithTag(Level.Tag)
+        for(CinematicDevice : CompletedLevelCinematics, Cinematic := cinematic_sequence_device[CinematicDevice]):
+            CurTags := CinematicDevice.GetTags()
+            if(not CurTags.Has[secondary{}]):
+                set CinematicsArray += array{Cinematic}
+        if(TrueCinematic := CinematicsArray[0]) then return option{TrueCinematic}
+        return false
+
+    GetLockDevice(Level : custom_level) : ?[]lock_device = 
+        var LocksArray : []lock_device = array{}
+        CompletedLevelLocks:=FindCreativeObjectsWithTag(Level.Tag)
+        for(LockDevice : CompletedLevelLocks, Lock := lock_device[LockDevice]):
+            set LocksArray += array{Lock}
+        return option{LocksArray}
+
+    GetVFXDevice(Level : custom_level) : ?vfx_spawner_device = 
+        var VFXsArray : []vfx_spawner_device = array{}
+        CompletedLevelVFXs:=FindCreativeObjectsWithTag(Level.Tag)
+        for(VFXDevice : CompletedLevelVFXs, VFX := vfx_spawner_device[VFXDevice]):
+            set VFXsArray += array{VFX}
+        if(TrueVFX := VFXsArray[0]) then return option{TrueVFX}
+        return false  
+
+    LevelCleared(Level : custom_level) : void = 
+        set Level.Cleared = true
+        #PlayRandomSFX()
+        PossiblePeely := GetCharacterDevice(Level)
+        if(Peely := PossiblePeely?) then {Peely.Enable(),Peely.Show(), Peely.InteractedWithEvent.SubscribeLevelCompletion(TransitionToNextLevel, Level)}
+
+    TransitionToNextLevel(Level : custom_level, Agent:agent) : void = 
+        PossibleTeleporter := GetTeleporterDevice(Level)
+        if(Teleporter := PossibleTeleporter?) then Teleporter.Enable()
+        PossibleCinematic := GetCinematicDevice(Level)
+        if(Cinematic := PossibleCinematic?) then {Cinematic.SetPlaybackFrame(0), Cinematic.Play()}
+        PossibleLock := GetLockDevice(Level)
+        if(Locks := PossibleLock?) then for(Lock:Locks) {Lock.Open(Agent)}
+        if(CurrentLevelArray:=LevelsToArrayCustomPlayersMap[Level]):
+            for(CustomPlayer:CurrentLevelArray, EachAgent:=agent[CustomPlayer.Player]):
+                EvilLaughSFX.Play(EachAgent)
+                EvilGuyWidget.Show(EachAgent)
+        PossibleVFX := GetVFXDevice(Level)
+        if(VFX := PossibleVFX?) then {VFX.Enable(), VFX.Restart()}
+        PossiblePeely := GetCharacterDevice(Level)
+        if(Peely := PossiblePeely?):
+            spawn{PeelyDisappearVFX(Peely.GetTransform())}
+            Peely.Hide()
+            Peely.Disable()
+
+    PeelyDisappearVFX(CharTransform : transform)<suspends> : void = 
+        if:
+            Translation := CharTransform.Translation + vector3{X := 0.0, Y:= 0.0, Z := 50.0}
+            SpawnedVFX := SpawnProp(EvilGuyDisppearVFX,Translation,rotation{})(0)?
+        then:
+            Sleep(2.0)
+            SpawnedVFX.Dispose()
+
+    ExitedClearedLevel(CustomPlayer:custom_player,Level:custom_level):void=
+        ClearedLevelDevices:=FindCreativeObjectsWithTag(Level.Tag)
+        for(Obj:ClearedLevelDevices, ClearedLevelObjectiveDevice:=objective_device[Obj]):
+            if(Agent:=agent[CustomPlayer.Player]) then ClearedLevelObjectiveDevice.DeactivateObjectivePulse(Agent)
 
     ResetLevel(Level:custom_level,Agent:agent)<suspends>:void=
         LevelTag:=Level.Tag
         Sleep(1.0)
         Print("Resetting Level")
         LevelDevices:=FindCreativeObjectsWithTag(LevelTag)
+        PossiblePeely := GetCharacterDevice(Level)
+        if(Peely := PossiblePeely?) then {Peely.Hide(), Peely.Disable()}
         #This resets guard spawner
         for(GuardSpanwer:LevelDevices, Guards:=guard_spawner_device[GuardSpanwer]):
             Print("Resetting guards")
@@ -431,45 +733,102 @@ Game_Manager := class(creative_device):
         #This resets Collectibles
         for(Collectible:LevelDevices, CollectibleDevice:=collectible_object_device[Collectible]):
             CollectibleDevice.RespawnForAll()
-        set Level.Completed=false
+        set Level.Cleared=false
 
-    ShopUI(Agent:agent):void=
-        CustomUI.ShowItemShopUI(true,4,option{Agent},AllItems)
+    ItemShopUI(Agent:agent):void=
+        CustomUI.ShowWeaponShopUI(true,4,option{Agent})
         ShopPulse.DeactivateObjectivePulse(Agent)
+        HealShopPulse.ActivateObjectivePulse(Agent)
+
+    HealShopUI(Agent:agent):void=
+        CustomUI.ShowUtilityShopUI(true,4,option{Agent})
+        HealShopPulse.DeactivateObjectivePulse(Agent)
 
     ############################################################################################################
     #Init Custom UI ############################################################################################
     InitCustomUI():void=
         set CustomUI.PlayerToCustomPlayerMap=CustomPlayers
         set CustomUI.RealTimeProp=option{RealTimeProp}
+        set CustomUI.CurrencyManager = CurrencyManager
+        <# set CustomUI.CloseUIInput = CloseUIInput
+        set CustomUI.CloseUIHUD = CloseUIHUD #>
         CustomUI.Assign()
-        CustomUI.ShowCurrencyTextUI(false,20,false)
-        CustomUI.ShowProgressBarUI(false,21,false,LevelsToArrayCustomPlayersMap.Length)
+        Print("Showing UIs ...")
+        for(CustomPlayer : CustomPlayers) :
+            Print("... to player ...")
+            if(Agent := agent[CustomPlayer.Player]) :
+                if(not CustomPlayer.NewPlayer?):
+                    Print("... best time")
+                    #CustomUI.ShowBestTimeUI(false, 6, option{Agent}) 
+                else:
+                    Print("... sike!")
+        #CustomUI.ShowCurrencyTextUI(false,20,false)
+        #CustomUI.ShowProgressBarUI(false,21,false,LevelsToArrayCustomPlayersMap.Length)
+        #CustomUI.ShowStopwatchUI(false,22,false)
 
-    GrantItem(Agent:agent):void=
+    <# GrantItem(Agent:agent):void=
         if:
             Player:=player[Agent]
             CustomPlayer:=CustomPlayers[Player]
             Index:=GetRandomInt(0, CustomPlayer.UnlockedItems.Length)
             SelectedItem:=CustomPlayer.UnlockedItems[Index]
         then:
-            SelectedItem.Granter.GrantItem(Agent)
+            SelectedItem.Granter.GrantItem(Agent) #>
 
-    SelectItemUI(Agent:agent)<suspends>:void=
-        Print("Spawning Item Selection")
+    SelectItemUI(Agent:agent,LevelIndex:int)<suspends>:void=
         Sleep(0.5)
-        CustomUI.ShowItemSelectionUI(true,2,option{Agent})
+        CustomUI.ShowItemSelectionUI(true,2,option{Agent},LevelIndex)
     
     EmptyInventory(Agent:agent):void=
         ClearInventory.Remove(Agent)
 
+    ############################################################################################################
+    #Gameplay ##################################################################################################
+    GameStart():void=
+        set GameRunning = true
+
+    PlayRandomSFX():void=
+        Index := GetRandomInt(0,BrainRotSFX.Length-1)
+        if (SelectedBrainRotSFX := BrainRotSFX[Index]) then SelectedBrainRotSFX.Play()
+
+    ApplyAbilities(DamageResult : device_ai_interaction_result) : void = 
+        if:
+            DamagedAgent := DamageResult.Target?
+            AIChar := DamagedAgent.GetFortCharacter[]
+        then:
+            AIChar.DamagedEvent().Subscribe(DamageCalculation)
+
+    DamageCalculation(DamagedResult:damage_result):void=
+        if:
+            TrueInstigator := DamagedResult.Instigator?
+            AttackAgent := TrueInstigator.GetInstigatorAgent[]
+            FortChar := AttackAgent.GetFortCharacter[]
+            Player := player[AttackAgent]
+            CustomPlayer := CustomPlayers[Player]
+        then:
+            DamageDealt := DamagedResult.Amount 
+            CurrentHealth := FortChar.GetHealth()
+            var CachedLifeStealRate : float = CustomPlayer.PlayerAbilities.LifeStealRate * 0.005
+            FortChar.SetHealth(CurrentHealth + DamageDealt * CachedLifeStealRate)
+            Chances := GetRandomInt(0, 100)
+            if(Chances < 2*CustomPlayer.PlayerAbilities.GoldDiggerRate):
+                GoldDiggerGranter.GrantItem(AttackAgent)
+
     #############################################################################################################
     #End Game ###################################################################################################
-    EndGameFunctionality(Agent:agent,ButtonIndex:int):void=
-        if (FortCharacter := Agent.GetFortCharacter[]):
-            FortCharacter.Damage(1000.0)
-        if(Player:=player[Agent],CustomPlayer:=CustomPlayers[Player]):
-            set CustomPlayer.LevelReached = -1
+    EndGameHUD(CustomPlayer:custom_player):void=
+        if:
+            Agent:=agent[CustomPlayer.Player]
+        then:
+            EndGameMessage.Show(Agent)
+            EndGameButton.Show(Agent)
+        UpdatePlayerData(CustomPlayer.Player, "TimesCompleted", CustomPlayer.PlayerStats.TimesCompleted * 1.0)
 
-    #We can also have on the first room 3 guns and after that same number minus one plus one ability or one heal 
+    EndGameFunctionality(Agent:agent,ButtonIndex:int):void=
+        if (FortChar := Agent.GetFortCharacter[]):
+            FortChar.Damage(1000.0)
+        if(Player:=player[Agent],CustomPlayer:=CustomPlayers[Player]):
+            CustomPlayer.SetCurrentLevelsClearedValue(0)
+
+    #TODO We can also have on the first room 3 guns and after that same number minus one plus one ability or one heal 
     #inspiration by tychoon games on the price tags
